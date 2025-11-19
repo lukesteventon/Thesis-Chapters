@@ -1,5 +1,5 @@
 ---
-title: "Chapter 4 - Data Linkage"
+title: "Chapter 3 - Data Linkage"
 author: "Luke Steventon"
 date: "`r Sys.Date()`"
 output: html_document
@@ -267,7 +267,6 @@ ovarian %>%
 2iv): Exclusion:
 Check that patients who have borderline tumours or ovarian sarcomas are not included. These were excluded in the initial data linkage.
 ```{r}
-fdsa
 ovarian %>% 
   count(PSEUDO_PAT) #n=33,222 ovarian cancer, primary peritoneal (gynae origin) or fallopian tube patients in total
 
@@ -632,8 +631,6 @@ tumour_table %>%
     filter(PSEUDO_PAT=="100029")
 ```
 
-
-
 3av): Then merge the SACT and NCRAS data by PSEUDO_PAT and PSEUDO_TUMOURID. 
 ```{r}
 ovarian %>% 
@@ -667,10 +664,35 @@ dataset %>%
   skimr::skim() #TUMOURID and other variables are 88.5% complete
 ```
 
+Clean GRADE data:
+```{r}
+grade_table<-dataset  %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "1|L"),"Low grade", GRADE)) %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "2|I"),"Intermediate grade", GRADE)) %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "3|4|H"),"High grade", GRADE)) %>%  
+  mutate(GRADE=ifelse(str_detect(GRADE, "6|X"),"Unknown grade", GRADE))
+
+grade_table %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT, PSEUDO_TUMOURID, GRADE) %>% 
+  write_csv("grade_table.csv")
+
+dataset<-dataset  %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "1|L"),"Low grade", GRADE)) %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "2|I"),"Intermediate grade", GRADE)) %>% 
+  mutate(GRADE=ifelse(str_detect(GRADE, "3|4|H"),"High grade", GRADE)) %>%  
+  mutate(GRADE=ifelse(str_detect(GRADE, "6|X"),"Unknown grade", GRADE))
+
+dataset  %>% 
+  select(GRADE) %>% 
+  skimr::skim() #88,68% complete
+```
+
+
 At this point I made the decision to exclude patients with missing tumour IDs. This was a considered decision that balanced cohort size with data quality issues. Where ID is missing there is significant missing information (11% missing diagnosis, diagnosis date, age etc.) which has the potential to cause significant bias in the planned studies. I therefore believe that the choice to exclude patients with incomplete diagnostic data is valid and can justify this.
 ```{r}
 dataset %>% 
-  count(PSEUDO_PAT) 
+  count(PSEUDO_PAT) #n=29927
 
 #Exclude this with missing diagnostic information from linkage
 excluded_patients<-dataset %>% 
@@ -704,7 +726,7 @@ excluded_patients%>%
   tbl_summary(by=NULL) %>% 
   add_n() %>% 
   as_gt() %>% 
-  gt::gtsave("excluded_patient_characteristics.docx")
+  gt::gtsave("excluded_patient_characteristics.docx") #n=4,751
   
 
 #Remove these patients from the dataset
