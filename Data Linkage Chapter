@@ -1,0 +1,1814 @@
+---
+title: "Chapter 3 - Data Linkage"
+author: "Luke Steventon"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+library(broom)
+library(ggplot2)
+library(skimr)
+library(survminer)
+library(survival)
+library(rbin)
+library(readr)
+library(here)
+knitr::opts_chunk$set(echo = TRUE)
+here()
+setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio")
+```
+
+Read datasets:
+```{r}
+#SACT dataset files. These are split into old and new files requiring concatenation.
+SACTTUMOURNEW_2019<-read_csv(
+  "ODR1920_080 SACTTUMOURNEW_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+SACTTUMOUROLD_2019<-read_csv(
+  "ODR1920_080 SACTTUMOUROLD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+SACTREGIMENNEW_2019<-read_csv(
+  "ODR1920_080 SACTREGIMENNEW_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ SACTREGIMENOLD_2019<-read_csv(
+  "ODR1920_080 SACTREGIMENOLD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ SACTDRUGNEW_2019<-read_csv(
+  "ODR1920_080 SACTDRUGNEW_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+                            
+ SACTDRUGOLD_2019<-read_csv(
+  "ODR1920_080 SACTDRUGOLD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ SACTCYCLENEW_2019<-read_csv(
+  "ODR1920_080 SACTCYCLENEW_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+SACTCYCLEOLD_2019<-read_csv(
+  "ODR1920_080 SACTCYCLEOLD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+#NCRAS registry datasets
+  patient_table<-read_csv(
+  "ODR1920_080_AV_Patient_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+  
+  tumour_table<-read_csv(
+  "ODR1920_080_AV_Tumour_2019Data_v2.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+  
+treatment_table<-read_csv(
+  "ODR1920_080_AV_Treatment_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ deprivation_table<-read_csv(
+  "ODR1920_080_AV_IMD_2019Data.csv",
+  col_names = TRUE,
+  
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+```
+
+1 - Link NCRAS patient to NCRAS tumour by PSEUDO_PAT. This is the  common identifier between the two datasets. As both datasets are collated by NCRAS, PSEUDO_PAT is a common ID that links patients information correctly.
+The dataset will become larger because 613999 patients have multiple tumour IDS. 
+```{r}
+patient_tumour<-patient_table %>% 
+  merge(tumour_table, by = "PSEUDO_PAT")
+
+#This operation links the demographic data from PATIENT_TABLE to tumour information from TUMOUR_TABLE. The length of the dataset produced is 839629 rows, which matches the TUMOUR_TABLE size. 
+```
+
+1i) First proof of correct data linkage between patient table (PHE) and tumour table. Firstly confirm each PSEUDO_PAT ID is unique.
+The NCRAS patient table has 839,629 unique patients. When using "distinct PSEUDO_PAT", the number of rows does not change. This confirms each PSEUDO_PAT ID is unique in the NCRAS patient table. 
+```{r}
+patient_table %>% 
+  count(PSEUDO_PAT) #n=839,629
+tumour_table %>% 
+  count(PSEUDO_PAT)#n=839,629
+#Linked patient and tumour table
+
+patient_tumour %>% 
+  count(PSEUDO_PAT)#n=839,629
+```
+
+1ii) The tumour table contains patient details relevant to each tumour that is recorded in NCRAS. One patient can have multiple tumours, for which diagnostic and treatment information is different. Firstly, confirm the number of IDS in the tumour table. This table can be linked to patient_table by PSEUDO_PAT.
+There are 795,719 rows in total. When using "distinct PSEUDO_PAT" the number of PSEUDO_PAT IDs is 839.629, indicating this many unique patients in the dataset.
+"Distinct PSEUDO_TUMOURID" shows that 795,664 PSEUDO_TUMOURIDS are unique. 
+```{r}
+#839,629 unique PSEUDO_PAT IDs in the tumour table
+tumour_table %>% 
+  distinct(PSEUDO_PAT,.keep_all = T) %>% 
+  count(PSEUDO_PAT) #839,629 unique PSEUDO_PAT IDS
+
+#1,122,073 unique PSEUDO_TUMOURIDS
+tumour_table %>% 
+  distinct(PSEUDO_TUMOURID,.keep_all = T) %>% 
+  count(PSEUDO_TUMOURID) 
+
+#217,550 patients have multiple tumour IDS
+tumour_table %>% 
+  distinct(PSEUDO_TUMOURID,.keep_all = T) %>% 
+  count(PSEUDO_PAT) %>% 
+  filter(n>1)
+
+patient_tumour %>% 
+  count(PSEUDO_PAT) #n=839,629 patients
+
+patient_tumour %>%
+  filter(str_detect(SITE_ICD10_O2,"C56|C57|C48")) %>% 
+  count(PSEUDO_PAT) #n=33,737 patients with an ICD-10 code describing ovarian (C56), fallopian tube (C48) or primary peritoneal cancer (C48 - some of these may be of non-gynae origin)
+```
+
+1iii) After creating the patient_tumour linked table, deprivation scores need to be added.
+The IMD_2019 dataset contains information on deprivation score, based on patient's location in England. This is a proxy measure based on socioeconomic and income level in the patient's postcode - however postcode/area information is not available due to identification issues. 
+
+```{r}
+deprivation_table %>% 
+  count(PSEUDO_PAT) #n=839,629 patients in total in the deprivation table
+
+deprivation_table %>% 
+  count(PSEUDO_TUMOURID) #n=1,022,522 unique tumour IDS
+
+deprivation_table %>% 
+  distinct(PSEUDO_TUMOURID,.keep_all = T) %>% 
+  count(PSEUDO_PAT) %>% 
+  filter(n>1) #n=191,487 patients have more than one tumour ID in the deprivation table
+```
+
+1iii) Deprivation data can  be joined to the NCRD registry by PSEUDO_PAT and PSEUDO_TUMOURID
+```{r}
+#There is a mismatch between the TUMOURIDs, therefore data cleaning required to get all IMD values on one line for each patient before linkage.
+patient_tumour %>% 
+  arrange(PSEUDO_PAT) %>% 
+  select(PSEUDO_PAT,PSEUDO_TUMOURID)
+deprivation_table %>% 
+    arrange(PSEUDO_PAT) %>%
+  select(PSEUDO_PAT,PSEUDO_TUMOURID)
+
+deprivation_table %>%
+  skimr::skim()
+   #value #n missing # complete rate #
+#	IMD2004	1055116	     0.05967259
+#	IMD2007	1073885	     0.04294551	
+#	IMD2010	1059217	     0.05601775	
+#	IMD2015	862044	     0.23173982	
+#	IMD2015_1	445039	  0.60337786
+
+
+#Then fill the values with the most recent, using 2015 as the reference. 2015 sits in the middle of hte SACT dataset period (2012-2020) and is therefore a valid measure where data may be missing.
+deprivation_table<-deprivation_table %>%  
+    mutate(IMD2015_1=ifelse(is.na(IMD2015_1),IMD2015,IMD2015_1)) %>%
+    mutate(IMD2015_1=ifelse(is.na(IMD2015_1),IMD2010,IMD2015_1)) %>% 
+    mutate(IMD2015_1=ifelse(is.na(IMD2015_1),IMD2007,IMD2015_1)) %>% 
+    mutate(IMD2015_1=ifelse(is.na(IMD2015_1),IMD2004,IMD2015_1)) 
+
+deprivation_table %>% 
+  select(IMD2015_1) %>% 
+  skimr::skim() #IMD_2015_1 is now 99.4% complete.
+
+#Retain one line per patient
+deprivation_table<-deprivation_table %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) 
+
+#Write table with clean deprivation data.
+deprivation_table %>% 
+  write_csv("deprivation_table.csv")
+
+deprivation_table %>% 
+  count(PSEUDO_PAT) #n=839,629
+
+#Merge deprivation data to main table
+patient_tumour_deprivation<-deprivation_table %>% 
+  select(-PSEUDO_TUMOURID) %>% 
+  merge(patient_tumour, by = "PSEUDO_PAT")
+
+patient_tumour_deprivation %>% 
+  count(PSEUDO_PAT) #n=839.629 all patients retained
+```
+
+2) Definition of the NCRD cohort:
+2i): Exclusion: filter for patients with an ovarian cancer diagnosis only. This includes C56 (ovarian cancer), C57 (fallopian tube), or C48 (primary peritoneal cancer) which may or may not be of gynaecological origin.
+
+```{r}
+patient_tumour %>% 
+  count(PSEUDO_PAT) #n=839.629
+
+#Isolate any patients with an ovarian cancer diagnosis by using ICD10 diagnostic codes.
+ovarian<-patient_tumour %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(diagnosis=ifelse(str_detect(SITE_ICD10_O2,"C56|C57|C48"),1,NA)) %>% 
+  fill(diagnosis,.direction="updown") %>% 
+  filter(diagnosis==1) %>% 
+  select(-diagnosis) %>% 
+  ungroup()
+
+ovarian %>% 
+  count(PSEUDO_PAT) #n=33,737 with ICD-10 code for gynae cancer as above
+```
+
+2ii): Remove patients under 18 years of age - paeds population is not of interest:
+```{r}
+ovarian %>% 
+  count(PSEUDO_PAT)#n=33737
+
+ovarian<-ovarian %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  filter(AGE>17) 
+
+ovarian %>% 
+  count(PSEUDO_PAT) #n=33,606
+```
+
+2iii): Exclusion: filter male patients with PP cancer of non-gynae origin.
+```{r}
+ovarian %>%
+  count(PSEUDO_PAT)  #n=33,606
+
+ovarian<-ovarian %>%
+  filter(SEX=="2")
+
+ovarian %>%
+  count(PSEUDO_PAT)  #n=33,222
+```
+
+Check the NCRAS table created matches the original tables:
+```{r}
+#patient_table %>% filter(PSEUDO_PAT==170) #DOB 5/1960, FEMALE, WHITE BRITISH
+#tumour_table %>% filter(PSEUDO_PAT==170) #AGE 47 IN 2007 SO D.O.B. MATCHES., C341
+#ovarian %>% filter(PSEUDO_PAT==170) 
+
+#consistent throughout
+```
+
+
+The next step is to create tables of SACT treatment. This exists separately to NCRAS data. The number of patients in each record is described below.
+```{r}
+#SACTTUMOURNEW_2019 %>% 
+#  count(PSEUDO_PAT) #n=449,310
+#
+#SACTTUMOUROLD_2019%>% 
+# count(PSEUDO_PAT) #n=599,651
+#
+#SACTDRUGNEW_2019 %>% 
+#  count(PSEUDO_PAT) #n=445210
+#
+#SACTDRUGOLD_2019%>% 
+# count(PSEUDO_MERGED_PATIENT_ID) #n=525797
+#
+#SACTREGIMENNEW_2019 %>% 
+#  count(PSEUDO_PAT) #n=449310
+#
+#SACTREGIMENOLD_2019%>% 
+# count(PSEUDO_MERGED_PATIENT_ID) #n=599,965
+#
+#SACTCYCLENEW_2019 %>% 
+#  count(PSEUDO_PAT) #n=449307
+#
+#SACTCYCLEOLD_2019%>% 
+# count(PSEUDO_MERGED_PATIENT_ID) #n=599,949
+```
+
+Check that IDs are consistent between OLD and NEW SACT datasets.
+```{r}
+#two examples of consistent tumourID 
+#SACTTUMOURNEW_2019%>% filter(PSEUDO_ENCORE_TUMOUR_ID==485489127) 
+#SACTTUMOUROLD_2019%>% filter(PSEUDO_TUMOURID==485489127) 
+#
+#SACTTUMOURNEW_2019%>% filter(PSEUDO_PAT==120738) 
+#SACTTUMOUROLD_2019%>% filter(PSEUDO_PAT==120738) 
+#
+#SACTTUMOURNEW_2019%>% filter(PSEUDO_ENCORE_TUMOUR_ID==485489127) 
+#SACTDRUGNEW_2019%>% filter(PSEUDO_ENCORE_TUMOUR_ID==485489127) 
+```
+
+#Assess completeness of SACT datasets
+```{r}
+#SACTTUMOUROLD_2019 %>%  
+#  skimr::skim()
+#
+#SACTREGIMENOLD_2019 %>%  
+#  skimr::skim()
+#
+#SACTCYCLEOLD_2019 %>%  
+#  skimr::skim()
+#
+#SACTDRUGOLD_2019 %>%  
+#  skimr::skim()
+#
+#SACTTUMOURNEW_2019 %>%  
+#  skimr::skim()
+#
+#SACTREGIMENNEW_2019 %>%  
+#  skimr::skim()
+#
+#SACTCYCLENEW_2019 %>%  
+#  skimr::skim()
+#
+#SACTDRUGNEW_2019 %>%  
+#  skimr::skim()
+```
+
+3ai) Link the oldSACT data together before linking to NCRAS:
+Linkage is complicated by different identifiers in the old and new data. This is described in the thesis by the diagram showing how these identifiers are related.
+
+```{r}
+#The SACT table is generated separately to the NCRD cohort, and is then concatenation into one table before linkage.
+#Due to data allocation it is necessary to cut the data only for the ovarian patients:
+filter<-ovarian %>% 
+  distinct(PSEUDO_PAT)#This operation creates a list of ovarian patients only so they can be isolated in the SACT data
+
+SACTTUMOUROLD_2019 %>% 
+  count(PSEUDO_PAT) #599,651
+
+SACTTUMOUROLD_2019 %>% 
+  merge(filter, by = "PSEUDO_PAT") %>% 
+  count(PSEUDO_PAT) #26,222
+
+SACTTUMOUROLD_2019 %>% 
+  skimr::skim()
+
+#Then repeat the method for the OLD data using the relevant identifiers
+sact_old<-SACTTUMOUROLD_2019 %>%  
+  merge(filter, by = "PSEUDO_PAT") %>% 
+  #right_join(SACTREGIMENOLD_2019, by = c("PSEUDO_MERGED_PATIENT_ID", "PSEUDO_MERGED_TUMOUR_ID")) %>% 
+  right_join(SACTREGIMENOLD_2019, by = c("PSEUDO_MERGED_PATIENT_ID", "PSEUDO_MERGED_TUMOUR_ID"))# %>% #Merge can be used as these IDs are all complete in the dataset
+  #merge(filter, by = "PSEUDO_PAT")
+
+sact_old %>% 
+  count(PSEUDO_PAT) #n=26,222
+
+sact_old %>% 
+  skimr::skim()
+
+#sact_old2<-sact_old%>% 
+ # merge(filter, by = "PSEUDO_PAT") %>% 
+ # right_join(SACTCYCLEOLD_2019, by = c("PSEUDO_MERGED_PATIENT_ID", "PSEUDO_MERGED_TUMOUR_ID","PSEUDO_MERGED_REGIMEN_ID")) %>% 
+ # merge(filter, by = "PSEUDO_PAT")
+
+#sact_old2%>% 
+ # count(PSEUDO_PAT) #n=26,222
+
+#sact_old2 %>% 
+ # skimr::skim()
+
+#sact_old2 %>% 
+ # filter(is.na(PSEUDO_TUMOURID))
+
+#Data check - this shows that records are preserved from the REGIMEN table when using right_join
+SACTREGIMENOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="732511")
+
+sact_old %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="732511")
+
+SACTREGIMENOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="983314")
+
+sact_old %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="983314")
+
+SACTREGIMENOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="093806")
+
+sact_old %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="093806")
+  
+#Then link DRUG detail to the regimen table
+sact_old3<-sact_old%>% 
+  merge(filter, by = "PSEUDO_PAT") %>% #helps operation to run
+  #right_join(SACTDRUGOLD_2019, by = c("PSEUDO_PAT","PSEUDO_MERGED_PATIENT_ID", "PSEUDO_MERGED_TUMOUR_ID")) %>%
+  right_join(SACTDRUGOLD_2019, by = c("PSEUDO_MERGED_PATIENT_ID", "PSEUDO_MERGED_TUMOUR_ID", "PSEUDO_MERGED_REGIMEN_ID")) %>%
+  merge(filter, by = "PSEUDO_PAT") #Retain only SACT records for patients with ovarian cancer
+
+#Data check - this shows that records are preserved from the REGIMEN table when using right_join
+SACTDRUGOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="732511")
+
+sact_old3 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="732511")
+
+SACTDRUGOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="983314")
+
+sact_old3 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="983314")
+
+SACTDRUGOLD_2019 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="093806")
+
+sact_old3 %>% 
+  filter(PSEUDO_MERGED_PATIENT_ID=="093806")
+
+sact_old3 %>% 
+  count(PSEUDO_PAT) #n=23,880 patients retained. This is the same as right join
+
+sact_old3 %>% 
+  filter(is.na(PSEUDO_TUMOURID)) %>% 
+  count(PSEUDO_PAT) #TUMOUR ID missing for 2,843 patients. it is 88.84% complete in th dataset
+
+sact_old3 %>% 
+  skimr::skim()
+```
+
+
+
+3aii) Repeat the linkage of the "new" SACT datasets using the appropriate identifiers.
+```{r}
+SACTTUMOURNEW_2019 %>% 
+  skimr::skim() #PSEUDO_ENCORE_TUMOUR_ID 73.3% complete
+
+SACTREGIMENNEW_2019 %>% 
+  skimr::skim() #PSEUDO_ENCORE_TUMOUR_ID 69.4% complete
+
+#Firstly join all SACT_NEW data by right joining
+sact_new<-SACTTUMOURNEW_2019 %>% 
+  merge(filter, by = "PSEUDO_PAT") %>%  # helps operation to run
+  right_join(SACTREGIMENNEW_2019, by = c("PSEUDO_PAT","PSEUDO_ENCORE_TUMOUR_ID", "PSEUDO_SACT_TUMOUR_ID")) %>% 
+  #group_by(PSEUDO_PAT, START_DATE_OF_REGIMEN) %>% 
+  #fill(PSEUDO_ENCORE_TUMOUR_ID,.direction="updown") %>% 
+  #ungroup() %>% 
+  distinct(PSEUDO_PAT, BENCHMARK_GROUP, START_DATE_OF_REGIMEN,.keep_all=T)#%>% #regimen is the top level of the SACT data
+  #right_join(SACTREGIMENNEW_2019, by = c("PSEUDO_PAT", "PSEUDO_SACT_TUMOUR_ID"))%>% #regimen is the top level of the SACT data. PSEUDO_ENCORE_TUMOUR_ID is not used as it is only 73.3% complete in the SACTTUMOURNEW table. PSEUDO_PAT and PSEUDO_SACT_TUMOUR_ID are complete therefore these were selected. This can associate treatments the patient received with idividual SACT regimens
+  #merge(filter, by = "PSEUDO_PAT") 
+
+sact_new %>% 
+  count(PSEUDO_PAT) ##n=16,943
+
+#Data check that linked data match REGIMEN table
+SACTREGIMENNEW_2019 %>% 
+  filter(PSEUDO_PAT=="100237") #1 regimen listed
+
+sact_new  %>% 
+  filter(PSEUDO_PAT=="100237") #1 regimen listed
+
+SACTREGIMENNEW_2019 %>% 
+  filter(PSEUDO_PAT=="101861") #1 regimen listed
+
+sact_new  %>% 
+  filter(PSEUDO_PAT=="101861") #1 regimen listed
+
+SACTREGIMENNEW_2019 %>% 
+  filter(PSEUDO_PAT=="100237") #1 regimen listed
+
+sact_new  %>% 
+  filter(PSEUDO_PAT=="100237") #1 regimen listed
+
+
+sact_new %>% 
+ skimr::skim() #PSEUDO_ENCORE_TUMOUR_ID 72% complete after this linkage. Only 60.1% is achieved when using PSEUDO_PAT and PSEUDO_SACT therefore this shows the best linkage
+
+#sact_new2<-sact_new%>% 
+  #merge(filter, by = "PSEUDO_PAT") %>%  # helps operation to run
+  #right_join(SACTCYCLENEW_2019, by = c("PSEUDO_PAT", "PSEUDO_ENCORE_TUMOUR_ID", "PSEUDO_SACT_TUMOUR_ID","PSEUDO_MERGED_REGIMEN_ID"))%>% 
+  #right_join(SACTCYCLENEW_2019, by = c("PSEUDO_PAT",  "PSEUDO_SACT_TUMOUR_ID"))%>% 
+  #merge(filter, by = "PSEUDO_PAT")
+
+#sact_new2 %>% 
+  #count(PSEUDO_PAT) #n=16943
+
+#sact_new2 %>% 
+# skimr::skim()
+
+SACTDRUGNEW_2019 %>% 
+  skimr::skim()
+
+sact_new3<-sact_new%>% 
+  merge(filter, by = "PSEUDO_PAT") %>%  # helps operation to run
+  right_join(SACTDRUGNEW_2019, by = c("PSEUDO_PAT", "PSEUDO_ENCORE_TUMOUR_ID","PSEUDO_SACT_TUMOUR_ID","PSEUDO_MERGED_REGIMEN_ID")) %>% 
+    #right_join(SACTDRUGNEW_2019, by = c("PSEUDO_PAT", "PSEUDO_SACT_TUMOUR_ID","PSEUDO_MERGED_REGIMEN_ID")) %>% 
+  merge(filter, by = "PSEUDO_PAT")  #Retain only SACT records for patients with ovarian cancer
+
+sact_new3 %>% 
+  count(PSEUDO_PAT) #n=16,883 ovarian patients 
+
+sact_new3 %>% 
+  filter(is.na(PSEUDO_ENCORE_TUMOUR_ID)) %>% 
+  count(PSEUDO_PAT) #TUMOURID missing for 6,042/16,883 patients
+
+#Describe completeness of data 
+sact_new3 %>% 
+  skimr::skim() #PSEUDO_TUMOUR_ID now 63.5% complete in the NEW sact data
+
+#Data check
+SACTDRUGNEW_2019 %>% 
+  filter(PSEUDO_PAT=="100237") #5 lines
+sact_new3  %>% 
+  filter(PSEUDO_PAT=="100237") #5 lines
+
+SACTDRUGNEW_2019 %>% 
+  filter(PSEUDO_PAT=="101861") #198
+
+sact_new3  %>% 
+  filter(PSEUDO_PAT=="101861") #198
+
+SACTDRUGNEW_2019 %>% 
+  filter(PSEUDO_PAT=="100237") #5 lines
+
+sact_new3  %>% 
+  filter(PSEUDO_PAT=="100237") #5 lines
+```
+
+3aiii). Then concatenate the OLD and NEW SACT datasets:
+```{r}
+#Then append the old and new sact datasets by selecting the same columns
+old_sact<-sact_old3 %>% 
+  select(PSEUDO_PAT, PSEUDO_TUMOURID, PRIMARY_DIAGNOSIS, ORGANISATION_CODE_OF_PROVIDER, STAGE_AT_START,ANALYSIS_GROUP,BENCHMARK_GROUP, HEIGHT_AT_START_OF_REGIMEN, WEIGHT_AT_START_OF_REGIMEN,START_DATE_OF_REGIMEN,CLINICAL_TRIAL,DRUG_GROUP, ADMINISTRATION_DATE,ADMINISTRATION_ROUTE,ACTUAL_DOSE_PER_ADMINISTRATION)
+
+new_sact<-sact_new3 %>% 
+  rename(PSEUDO_TUMOURID=PSEUDO_ENCORE_TUMOUR_ID) %>% 
+  select(PSEUDO_PAT, PSEUDO_TUMOURID, PRIMARY_DIAGNOSIS, ORGANISATION_CODE_OF_PROVIDER, STAGE_AT_START,ANALYSIS_GROUP,BENCHMARK_GROUP, HEIGHT_AT_START_OF_REGIMEN, WEIGHT_AT_START_OF_REGIMEN,START_DATE_OF_REGIMEN,CLINICAL_TRIAL,DRUG_GROUP, ADMINISTRATION_DATE,ADMINISTRATION_ROUTE,ACTUAL_DOSE_PER_ADMINISTRATION) 
+
+all_sact<-rbind(old_sact,new_sact)
+
+all_sact%>% count(PSEUDO_PAT) #n=30,997 ovarian patients with drug level of detail
+```
+
+3aiv): Cleaning of SACT data:
+```{r}
+all_sact %>% 
+  skimr::skim() %>% 
+  write_csv("SACT_completeness_before_cleaning.csv")
+
+all_sact<-all_sact %>% 
+  distinct(PSEUDO_PAT, DRUG_GROUP, ADMINISTRATION_DATE, PSEUDO_TUMOURID,.keep_all=T) %>% #select one line per drug, per patient, and retain different tumour IDS. These contain NAs that can be filled to improve linkage
+  mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE)) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE)
+
+all_sact %>% 
+  skimr::skim()
+
+all_sact %>% 
+  skimr::skim() %>% 
+  write_csv("SACT_completeness_after_cleaning.csv")
+```
+
+3av):Filter out NOT CHEMO, STEROID, FLUCONAZOLE AND DEXAMETHASONE as these are supportive drugs and not required for the plans studies.
+n=30997 bfeore
+n=30894 patients after by this operation
+```{r}
+all_sact %>% 
+  count(PSEUDO_PAT) #n=30,997
+
+
+#Remove steroid, not chemo and other drugs of non-interest
+all_sact<-all_sact %>% 
+  filter(!str_detect(DRUG_GROUP,"NOT CHEMO|STEROID|DEXAMETHASONE|FLUCONAZOLE|TRIAL"))
+
+all_sact %>% 
+  count(PSEUDO_PAT) #n=30,838
+
+all_sact %>% 
+  skimr::skim() #PSEUDO_TUMOUIRD 75% complete
+
+#Fill TUMOUR_ID where dates are the same
+all_sact<-all_sact %>% 
+  group_by(PSEUDO_PAT,ADMINISTRATION_DATE) %>% 
+  fill(PSEUDO_TUMOURID,.direction="updown") %>%
+  ungroup()
+
+all_sact%>% 
+   skimr::skim() #PSEUDO_TUMOURID is now 89.3% after associating treatments on the same day with another, where TUMOURID was missing. This variable needs to be as complete as possible to maximise linkage (previously 63.5% before filling PSEUDO_TUMOURID by date)
+```
+
+Can PRIMARY DIAGNOSIS AND SITE ICD be used to link where TUMOURID is missing?
+The answer is no...
+```{r}
+all_sact %>%
+  filter(is.na(PSEUDO_TUMOURID)) #10% missingness of TUMOURID
+
+all_sact %>% 
+  select(PSEUDO_PAT, PRIMARY_DIAGNOSIS, DRUG_GROUP, ADMINISTRATION_DATE, PSEUDO_TUMOURID) %>% 
+  filter(PSEUDO_PAT=="100029")
+
+tumour_table %>% 
+  select(PSEUDO_PAT, SITE_ICD10_O2, PSEUDO_TUMOURID) %>% 
+    filter(PSEUDO_PAT=="100029")
+```
+
+
+
+3av): Then merge the SACT and NCRAS data by PSEUDO_PAT and PSEUDO_TUMOURID. 
+```{r}
+ovarian %>% 
+  skimr::skim() #n=33,222 unique ovarian patients in NCRAS
+
+all_sact %>% 
+  count(PSEUDO_PAT) #n=30,838 unique patients in SACT
+
+dataset<-tumour_table %>% 
+ right_join(all_sact,by=c("PSEUDO_TUMOURID", "PSEUDO_PAT"))#should keep 837193 lines
+
+dataset<-patient_table %>% 
+ merge(dataset,by="PSEUDO_PAT")#should keep 837193 lines
+
+dataset %>% 
+  mutate(missing=ifelse(is.na(SITE_ICD10_O2),1,NA)) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(missing,.direction="updown") %>% 
+  filter(missing==1) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP)%>% 
+  select(PSEUDO_PAT,PSEUDO_TUMOURID, ADMINISTRATION_DATE, DRUG_GROUP, SITE_ICD10_O2) #183000/837000 lines having missing TUMOURID after linkage
+
+#dataset<-ovarian %>% 
+# right_join(all_sact,by=c("PSEUDO_TUMOURID", "PSEUDO_PAT")) #This operation joins all SACT treatments to the matching PSEUDO_PAT and PSEUDO_TUMOURID. This associates treatments with patient diagnostic information, however can result in duplication of drug treatments. This will be cleaned later. This has to be right_join to retain all SACT treatments associated with each patient
+
+dataset %>% 
+  count(PSEUDO_PAT) #n=28,542 when merging, n=33,222 when left_join, 30,838 when right_join. This contains a list of all treatments for each patient, but where PSEUDO_TUMOURID is missing the data won't link, leaving missing data in sex, ethnicity, site ICD etc.
+
+#This operation causes data incompleteness when PSEUDO_TUMOURID is missing.
+dataset %>% 
+  skimr::skim() #TUMOURID and other variables are 88.5% complete
+```
+
+At this point I made the decision to exclude patients with missing tumour IDs. This was a considered decision that balanced cohort size with data quality issues. Where ID is missing there is significant missing information (11% missing diagnosis, diagnosis date, age etc.) which has the potential to cause significant bias in the planned studies. I therefore believe that the choice to exclude patients with incomplete diagnostic data is valid and can justify this.
+```{r}
+dataset %>% 
+  count(PSEUDO_PAT) 
+
+#Exclude this with missing diagnostic information from linkage
+excluded_patients<-dataset %>% 
+  mutate(missingness=ifelse(is.na(DIAGNOSISDATEBEST),1,NA)) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(missingness,.direction = "updown") %>% 
+  filter(missingness==1) %>% 
+  ungroup()
+
+excluded_patients%>% 
+  count(PSEUDO_PAT) #n=4,968 patients with missing diagnostic information due to missing TUMOURID or otherwise missing fields
+#Write table for dataset before patients are exclued by missing TUMOURID
+dataset %>%
+distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
+  tbl_summary(by=NULL) %>% 
+  add_n() %>% 
+  write_csv("patient_characteristics_before_exclusion.csv")
+
+
+
+#Write table for patients excluded due to TUMOURID
+excluded_patients%>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
+  tbl_summary(by=NULL) %>% 
+  add_n() %>% 
+  write_csv("excluded_patient_characteristics.csv")
+  
+
+#Remove these patients from the dataset
+dataset<-dataset %>% 
+  mutate(missingness=ifelse(is.na(DIAGNOSISDATEBEST),1,NA)) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(missingness,.direction = "updown") %>% 
+  filter(is.na(missingness)) %>% 
+  ungroup()
+
+dataset %>% 
+  count(PSEUDO_PAT) #n=25,870 included
+
+dataset %>% 
+  skimr::skim() #data are now largely complete for diagnostics. this is important for the future planned studies. 
+```
+
+
+```{r}
+#Fill all baseline variables by PSEUDO_PAT
+datasetclean<-dataset %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(VITALSTATUS,.direction = "updown") %>% 
+  fill(MONTH_DOB,.direction = "updown") %>% 
+  fill(YEAR_DOB,.direction = "updown") %>% 
+  fill(SEX,.direction = "updown") %>% 
+  fill(ETHNICITY,.direction = "updown") %>% 
+  fill(ETHNICITYNAME,.direction = "updown") %>% 
+  fill(VITALSTATUSDATE,.direction = "updown") %>% 
+  fill(VITALSTATUS,.direction = "updown") %>% 
+  fill(VITALSTATUS,.direction = "updown") %>% 
+  ungroup() %>% 
+  select(-(EMBARKATION:BIGTUMOURCOUNT),-(NODESEXCISED:DUKES_),-(CLARKS_:M_BEST),-(STATUSOFREGISTRATION:FINAL_ROUTE))
+
+datasetclean %>% 
+  skimr::skim() #baseline variables 99.97% complete
+```
+
+
+```{r}
+datasetclean<-datasetclean %>% 
+  group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
+  fill(DIAGNOSISDATEBEST,.direction = "updown") %>% 
+  fill(BASISOFDIAGNOSIS,.direction = "updown") %>% 
+  fill(SITE_ICD10_O2,.direction = "updown") %>% 
+  fill(SITE_CODED,.direction = "updown") %>% 
+  fill(SITE_CODED_DESC,.direction = "updown") %>% 
+  fill(CODING_SYSTEM,.direction = "updown") %>% 
+  fill(CODING_SYSTEM_DESC,.direction = "updown") %>% 
+  fill(MORPH_CODED,.direction = "updown") %>% 
+  fill(BEHAVIOUR_ICD10_O2,.direction = "updown") %>% 
+  fill(BEHAVIOUR_CODED,.direction = "updown") %>% 
+  fill(BEHAVIOUR_CODED_DESC,.direction = "updown") %>% 
+  fill(HISTOLOGY_CODED_DESC,.direction = "updown") %>% 
+  fill(HISTOLOGY_CODED,.direction = "updown") %>% 
+  fill(GRADE,.direction = "updown") %>% 
+  fill(TUMOURSIZE,.direction = "updown") %>% 
+  fill(FIGO_,.direction = "updown") %>% 
+  fill(AGE,.direction = "updown") %>% 
+  fill(STAGE_BEST,.direction = "updown") %>% 
+  fill(STAGE_BEST_SYSTEM,.direction = "updown") %>% 
+  ungroup()
+
+datasetclean %>% 
+  skimr::skim() #diagnostic variables such as SITE_ICD10 remain 99.99% complete. This is because details can not be filled where TUMOURID is missing.
+```
+
+I have then chosen to retain only patients who we have full diagnostic information for. After investigating several methods of data linkage this has been selected as the best option, as there are no comparable variables that allow for probabalistic linkage of drug treatments with no PSEUDO_TUMOURID. 
+
+I attempted to define a tumourID however this can vary in quick date succession - i.e. if a patient moves from 1st line carboplatin to 2nd line carbo/PLD, the treatments can change quickly but this would be defined as a new TUMOURID in the NCRAS registry. Therefore any attempt to manually code this is prone to lots of linkage error. 
+
+For this reason I have decided to retain only patients with complete information. I will demonstrate this as a representative cohort.
+```{r}
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=25,870 before removing those with poor linkage
+
+datasetclean<-datasetclean %>% 
+  filter(!is.na(MONTH_DOB))  #DOB month chosen as the missingness marker - if linkage was successful this would have been removed.
+
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=25,870 - all patients hvae month dob
+```
+
+
+```{r}
+#This represents best possible linkage using TUMOUR, REGIMEN and DRUG tables. This is the best possible linkage with drug detail that is required for studies
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=25,870
+
+datasetclean %>% 
+  skimr::skim()
+```
+
+
+Then retain one line per patient, per drug, per date
+```{r}
+datasetclean #654,024
+
+datasetclean<-datasetclean %>% 
+  mutate(DRUG_GROUP=ifelse(str_detect(DRUG_GROUP, "LIPOSOMAL DOXO"),"LIPOSOMAL DOXORUBICIN", DRUG_GROUP)) %>% 
+  distinct(PSEUDO_PAT, DRUG_GROUP, ADMINISTRATION_DATE,.keep_all=T)
+
+datasetclean #487,744 rows. Duplicated rows removed
+```
+
+5iii):
+Calculate BMI:
+```{r}
+datasetclean<-datasetclean %>% 
+  mutate(HEIGHT_AT_START_OF_REGIMEN=as.numeric(HEIGHT_AT_START_OF_REGIMEN)) %>% 
+  mutate(WEIGHT_AT_START_OF_REGIMEN=as.numeric(WEIGHT_AT_START_OF_REGIMEN)) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(BMI=WEIGHT_AT_START_OF_REGIMEN/(HEIGHT_AT_START_OF_REGIMEN^2)) %>% 
+  ungroup() 
+
+#Clean BMI if height or weight are clearly erroneous
+datasetclean<-datasetclean %>% 
+  mutate(BMI=ifelse(BMI<5,NA,BMI)) %>% 
+  mutate(BMI=ifelse(BMI>75,NA,BMI))
+
+datasetclean<-datasetclean %>% 
+  group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
+  fill(BMI,.direction="updown") %>% 
+  ungroup()
+
+datasetclean %>% 
+  select(BMI) %>% 
+  skimr::skim() #BMI 84.9% complete
+```
+
+5iv): Data cleaning:
+STAGE_BEST and FIGO columns were clean to standardised criteria. Ovarian cancer staging is done according to FIGO, therefore if STAGE_BEST was missing, FIGO values were used to fill STAGE_BEST to achieve maximal completeness.
+```{r}
+#Completeness of stage before data cleaning
+datasetclean %>%
+  select(STAGE_BEST, FIGO_) %>% 
+  skimr::skim() #stage_BEST 5.7 complete, FIGO 64.3% complete
+
+#Clean staging data to unify terms into common groups:
+datasetclean<-datasetclean %>%
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="1","1", NA)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="2","2", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="3","3", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="4","4", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2A|2a"),'2A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2B|2b"),'2B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2c|2C"),'2C', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3B|3b"),'3B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3C|3c"),'3C', STAGE_BEST_CLEAN)) %>%
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4A|4a"),'4A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4B|4b"),'4B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4C|4c"),'4C', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4S"),'4', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"NA|X|U"),NA, STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="?",NA, STAGE_BEST_CLEAN)) #%>% 
+        #  mutate(STAGE_BEST_CLEAN=ifelse(is.na(STAGE_BEST),NA,STAGE_BEST_CLEAN)) 
+
+
+#Clean FIGO staging as per STAGE_BEST
+  datasetclean<-datasetclean %>%
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="1","1", NA)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="I","1", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IA|ia|Ia|iA|1A|1a|1a1|1a2|1A1|1A2"),'1A', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IB|ib|Ib|iB|1B|1b|1b1|1b2|1B1|1B2"),'1B', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "1C|ic|Ic|iC|1C1|1Ci|1ci|1c1|1C2|1c2"),'1C', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="2","2", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="II","2", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIA|iia|IIa|iiA|2A|2a|2a1|2a2|2A1|2A2"),'2A', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIb|IIB|iib|iiB|2B|2b|2b1|2b2|2B1|2B2"),'2B', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIC|iic|IIc|2C|2C1|2Ci|2ci|2c1|2C2|2c2"),'2C', FIGO__CLEAN)) %>%  
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="3","3", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="III","3", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIIA|iiia|IIIa|iiiA|3A|3a|3a1|3a2|3A1|3A2"),'3A', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIIB|iiib|IIIb|iiiB|3B|3b|3b1|3b2|3B1|3B2"),'3B', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IIIC|iiic|iiiC|IIIc|3C|3C1|3Ci|3ci|3c1|3C2|3c2"),'1C', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="4","4", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="IV","4", FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IVA|iva|IVa|iva|4A|4a|4a1|4a2|4A1|4A2"),'4A', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IVB|IVb|ivB|ivb|4B|4b|4b1|4b2|4B1|4B2"),'4B', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(str_detect(FIGO_, "IVC|IVc|ivC|ivc|4C|4C1|4Ci|4ci|4c1|4C2|4c2"),'4C', FIGO__CLEAN)) %>% 
+          mutate(FIGO__CLEAN=ifelse(FIGO_=="?",NA, FIGO__CLEAN)) #%>% 
+
+
+#Fill STAGE_BEST and FIGO cleaned terms by PSEUDO_PAT
+datasetclean<-datasetclean %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(FIGO__CLEAN,.direction="updown") %>% 
+  fill(STAGE_BEST_CLEAN,.direction="updown") %>% 
+  ungroup()
+
+#Replace missing values with STAGE_BEST and FIGO where value=NA
+datasetclean<-datasetclean%>%
+  mutate(STAGE_BEST_CLEAN=ifelse(is.na(STAGE_BEST_CLEAN), FIGO__CLEAN, STAGE_BEST_CLEAN))
+
+datasetclean<-datasetclean%>%
+ mutate(FIGO__CLEAN=ifelse(is.na(FIGO__CLEAN), STAGE_BEST_CLEAN, FIGO__CLEAN)) %>% 
+  ungroup()
+
+#Count cleaned stage data terms.
+datasetclean %>% 
+count(STAGE_BEST_CLEAN)
+
+datasetclean %>% 
+    count(FIGO__CLEAN)
+
+datasetclean<-datasetclean %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(FIGO__CLEAN,.direction="updown") %>% 
+  fill(STAGE_BEST_CLEAN,.direction="updown") %>% 
+  ungroup()
+
+#Completeness of stage after data cleaning
+datasetclean %>%
+  select(STAGE_BEST, FIGO_) %>% 
+  skimr::skim() #stage_best 95.7% complete, FIGO 64.4% complete
+```
+
+5v): Cleaning of ethnicity terms. Terms are grouped according to broad UK census terminology to allow for comparison between groups in planned studies.
+```{r}
+datasetclean %>% 
+  select(ETHNICITYNAME) %>% 
+  skimr::skim()
+  
+  datasetclean %>% 
+mutate(ETHNICITYNAME = recode(ETHNICITYNAME,
+                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
+                                'ASIAN BANGLADESHI' = "Asian",
+                                'ASIAN INDIAN' = "Asian",
+                                'ASIAN PAKISTANI' = "Asian",
+                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
+                                'BLACK AFRICAN' = "Black",
+                                'BLACK CARIBBEAN' = "Black",
+                                'ANY OTHER BLACK BACKGROUND' = "Black",
+                                'MIXED WHITE AND ASIAN' = "Mixed Race",
+                                'ANY OTHER MIXED BACKGROUND' = "Mixed Race",
+                                'MIXED WHITE AND BLACK AFRICAN' = "Mixed Race",
+                                'MIXED WHITE AND BLACK CARIBBEAN' = "Mixed Race",
+                                'CHINESE' = "Asian",
+                                'WHITE' = "White",
+                                'WHITE BRITISH' = "White",
+                                'WHITE IRISH' = "White",
+                                'ANY OTHER WHITE BACKGROUND' = "White",
+                                'NOT KNOWN' = "Unknown",
+                                'NOT STATED' = "Unknown",
+                                'ANY OTHER ETHNIC GROUP' = "Other",
+                                ))
+
+datasetclean<-datasetclean %>% 
+  ungroup() %>% 
+  mutate(ETHNICITYNAME=ifelse(is.na(ETHNICITYNAME), "Unknown", ETHNICITYNAME))
+
+datasetclean %>% 
+  select(ETHNICITYNAME) %>% 
+  skimr::skim() #100% complete
+```
+
+5vi): Cleaning of VITALSTATUS. This is the variable allowing for overall survival analysis.
+```{r}
+#Before data cleaning
+datasetclean %>%  
+  count(VITALSTATUS) #0.43% marked as X - unknown
+
+datasetclean<-datasetclean %>%  
+  mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"X"),"UNK", VITALSTATUS)) %>% 
+  mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"D"),"D", VITALSTATUS)) %>% 
+  mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"A"),"A", VITALSTATUS)) 
+
+#After data cleaning
+datasetclean %>% 
+  count(VITALSTATUS)
+```
+
+5vii:) Overall assessment of data completeness:
+```{r}
+datasetclean %>% 
+skimr::skim()
+```
+
+4i): Save data
+```{r}
+datasetclean %>% 
+write_csv("linked_dataset_18NOV25.csv")
+
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=25,870
+
+datasetclean %>% 
+  skimr::skim()
+```
+
+4ii): Read in dataset for speed:
+```{r}
+datasetclean<-read_csv(
+  "linked_dataset_18NOV25.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+datasetclean %>% 
+  skimr::skim()
+
+datasetclean %>% 
+  arrange(PSEUDO_PAT)
+```
+Checks of data against original SACT tables
+```{r}
+datasetclean %>% 
+  filter(PSEUDO_PAT=="100019")
+
+all_sact %>% 
+  filter(PSEUDO_PAT=="100019")
+
+datasetclean %>% 
+  filter(PSEUDO_PAT=="100287")
+
+all_sact %>% 
+  filter(PSEUDO_PAT=="100287")
+
+datasetclean %>% 
+  filter(PSEUDO_PAT=="102263")
+
+all_sact %>% 
+  filter(PSEUDO_PAT=="102263")
+```
+
+
+6)Some records of chemotherapy hospital attendances are contained in the HES records but not the SACT records. These records contain a code describing chemotherapy and the date attended, however they do not contain any description of the treatment given. To have the most complete picture for each patient, it is necessary to link HES OP and APC data which also contains records of chemotherapy. This is reported as 6-7% of treatments that may not appear in the SACT dataset as per Breast Cancer Audit authored by Zhe Wang/David Dodwell.
+
+Firstly, import all HES APC and OP data and isolate the chemotherapy visits denoted by X70-74.
+```{r}
+#HESADMISSION1<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER2122_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION2<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER2021_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION3<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1920_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION4<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1819_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION5<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1718_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION6<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1617_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION7<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1516_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION8<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1415_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION9<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1314_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION10<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1213_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION11<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1112_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#HESADMISSION12<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_OPER1011_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,OPDATE_01)
+#```
+#
+#Import HES outpatient records. These tables contain records of chemotherapy administrations.
+#```{r}
+#HESOUTPATIENT1<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER2122_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#  distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT2<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER2021_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT3<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1920_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT4<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1819_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT5<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1718_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT6<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1617_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT7<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1516_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT8<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1415_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT9<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1314_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT10<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1213_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT11<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1112_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#HESOUTPATIENT12<-read_csv(
+#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_OPER1011_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL) %>% 
+#    distinct(PSEUDO_PAT, OPERTN_01,PSEUDO_ATTENDKEYANON)
+#```
+#Then read HES OP as this contains exact dates. This is linked to HES OP OPER by PSEUDOKEYANON
+#```{r}
+#HESoutpatient1<-read_csv(
+#  "ODR1920_080_HESOP1921_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, APPTDATE,PSEUDO_ATTENDKEYANON)
+#HESoutpatient2<-read_csv(
+#  "ODR1920_080_HESOP2122_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, APPTDATE,PSEUDO_ATTENDKEYANON)
+#HESoutpatient3<-read_csv(
+#  "ODR1920_080_HESOP1619_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, APPTDATE,PSEUDO_ATTENDKEYANON)
+#HESoutpatient4<-read_csv(
+#  "ODR1920_080_HESOP1316_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, APPTDATE,PSEUDO_ATTENDKEYANON)
+#HESoutpatient5<-read_csv(
+#  "ODR1920_080_HESOP1013_2019Data.csv",
+#  col_names = TRUE,
+#  col_types = cols(.default = col_character()),
+#  col_select = NULL)%>% 
+#  distinct(PSEUDO_PAT, APPTDATE,PSEUDO_ATTENDKEYANON)
+#```
+#
+#Link the HES APC and HES OP tables together and isolate appointment dates only. These will be used to identify #chemotherapy treatments ##that may not be recorded in the SACT dataset.
+#```{r}
+##Rename HESAPC dates to APPTDATE
+#HESADMISSION1<-HESADMISSION1 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION2<-HESADMISSION2 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION3<-HESADMISSION3 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION4<-HESADMISSION4 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION5<-HESADMISSION5 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION6<-HESADMISSION6 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION7<-HESADMISSION7 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION8<-HESADMISSION8 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION9<-HESADMISSION9 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION10<-HESADMISSION10 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION11<-HESADMISSION11 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#HESADMISSION12<-HESADMISSION12 %>% 
+#  rename(APPTDATE=OPDATE_01)
+#```
+#
+#Create one unified dataset for all records of HES chemotherapy interactions:
+#```{r}
+#HESOP1<-rbind(HESOUTPATIENT1,HESOUTPATIENT2,HESOUTPATIENT3,HESOUTPATIENT4,HESOUTPATIENT5,HESOUTPATIENT6,HESOUTPATIENT7,HESOUTPATIENT8,HESOU#TPATIENT9,HESOUTPATIENT10,HESOUTPATIENT11,HESOUTPATIENT12) 
+#
+#HESOP1 %>% 
+#  count(PSEUDO_PAT) #n=835,032 unique patients in HESOPER
+#
+#HESOP1 %>% 
+#  count(PSEUDO_ATTENDKEYANON)#n=XXX unique attendances (PSEUDOKEYANON) in HESOPER
+#
+#HESOP2<-rbind(HESoutpatient1,HESoutpatient2,HESoutpatient3,HESoutpatient4,HESoutpatient5)
+#
+#HESOP2 %>% 
+#count(PSEUDO_PAT) #n=824,661 unique patients in HESOP
+#
+#HESOP2 %>% 
+#  count(APPTDATE)#n=1,178,397 unique appointments in HESOP
+#```
+
+#Merge the HES OP data which provides the APPTDATE
+```
+
+```{r}
+#HESOPALL<-HESOP1 %>% 
+#  filter(str_detect(OPERTN_01,"X70|X71|X72|X73|X74")) %>% #Select OPCS4 codes describing chemotherapy or anti-cancer therapy visits
+#  distinct(PSEUDO_PAT,PSEUDO_ATTENDKEYANON) %>% #Retain one line per patient and visit
+#  merge(HESOP2, by = c("PSEUDO_PAT","PSEUDO_ATTENDKEYANON")) #Merge with HES outpatient records to bring in the appointment date. This is #needed before linkage to the main cohort.
+#
+#HESOPALL %>% 
+#  count(PSEUDO_PAT) #n=182,040 unique patients who had chemotherapy as an outpatient recorded in HES
+#
+#HESOPALL %>% 
+#  count(PSEUDO_ATTENDKEYANON)#n=XXX unique appointments in HESOPER
+#
+#hes_APC<-rbind(HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5,HESADMISSION6,HESADMISSION7,HESADMISSION8,HESADMISSION#9,HESADMISSION10,HESADMISSION11,HESADMISSION12) 
+#
+#hes_APC %>% 
+#  count(PSEUDO_PAT) #n=830,847 unique patients in HESAPC
+#
+#hes_APC %>% 
+#  count(APPTDATE)#n=XXX unique appointments in HESAPC
+#
+#hes_APC_chemo<-hes_APC %>% 
+#  filter(str_detect(OPERTN_01,"X70|X71|X72|X73|X74")) %>% #Select OPCS4 codes describing chemotherapy or anti-cancer therapy visits
+#  distinct(PSEUDO_PAT, APPTDATE) #Retain one line per patient and appointment date
+#
+#hes_APC_chemo %>% 
+#  count(PSEUDO_PAT) #n=604,258 unique patients with a chemotherapy attendance recorded in HES AP
+#
+#hes_APC_chemo %>% 
+#  count(APPTDATE)#n=6,849,101 unique chemotherapy appointment dates recorded in HES APC
+#
+#HESOPALL<-HESOPALL %>% 
+#  select(PSEUDO_PAT, APPTDATE)
+#```
+
+#Bind all HES APC and OP data to get a list of all chemotherapy attendances recorded in HES
+#```{r}
+#HES_DATA_COMPLETE<-rbind(hes_APC_chemo,HESOPALL) 
+#
+#HES_DATA_COMPLETE %>% 
+#  count(PSEUDO_PAT) #n=716,400 unique patients in HESAPC
+#
+#HES_DATA_COMPLETE %>% 
+#  arrange(PSEUDO_PAT) %>% 
+#  distinct(PSEUDO_PAT,APPTDATE)
+#
+##Remove files from R workspace - data operation
+#rm(HESoutpatient1, HESoutpatient2,HESoutpatient3,HESoutpatient4,HESoutpatient5,HESOUTPATIENT1,HESOUTPATIENT2,HESOUTPATIENT3,HESOUTPATIENT4,#HESOUTPATIENT5,HESOUTPATIENT6,HESOUTPATIENT7,HESOUTPATIENT8,HESOUTPATIENT9,HESOUTPATIENT10,HESOUTPATIENT11,HESOUTPATIENT12, #HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5,HESADMISSION6,HESADMISSION7,HESADMISSION8,HESADMISSION9,HESADMISSION1#0,HESADMISSION11,HESADMISSION12)
+```
+
+Write a file for the HES data to avoid importing again. This is a record chemotherapy appointments in  HES.
+```{r}
+HES_DATA_COMPLETE <-  read_csv(
+  "HESdata_all_chemo.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+datasetclean<-read_csv(
+  "linked_dataset_18NOV25.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ovarian_HES_chemo_records<-datasetclean %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(HES_DATA_COMPLETE, by = "PSEUDO_PAT") %>%  #Retain only HES chemotherapy records for ovarian cancer patients in the selected cohort
+  ungroup()
+
+ovarian_HES_chemo_records %>%
+  count(PSEUDO_PAT) #n=24,939 patients of 25,870 ovarian in NCRAS have a chemo record in HES (96.5%)
+```
+
+I have opted not to include this step as it reduces data coverage and complicates the dataset. Patients with previous SACT recorded only in the HES dataset may be treated for another cancer - it is not clear. First-line therapies are identified in individual studies using the diagnosis date - this can be used in reference to the first treatment to identify first-line therapy.
+
+The HES records then need to be incorporated into the SACT dataset to ensure we have all treatment dates for patients:
+```{r}
+#ovarian_HES_chemo_records %>% 
+#  count(PSEUDO_PAT) #N=24939 / 25,870 ovarian patients who had SACT IN HES
+#
+#ovarian_HES_chemo_records 
+# #n=458,246 unique chemo appointment
+#
+##Confirm number of SACT treatments
+#datasetclean %>% 
+# distinct(PSEUDO_PAT, ADMINISTRATION_DATE) %>%  #n=25,870 SACT
+#  count(PSEUDO_PAT) 
+#
+#datasetclean %>% 
+# distinct(PSEUDO_PAT, ADMINISTRATION_DATE) #343,521 individual treatment dates in the SACT dataset
+```
+
+Link SACT to HES dates:
+```{r}
+#Create tables for all dates for each patient in HES and SACT
+#ovarian_HES_dates<-ovarian_HES_chemo_records %>% 
+#  distinct(PSEUDO_PAT, APPTDATE) %>% 
+#  rename(ADMINISTRATION_DATE=APPTDATE) %>% 
+#  mutate(marker="HES") %>% 
+#  mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE))
+#
+#ovarian_SACT_record<-datasetclean%>% 
+#  distinct(PSEUDO_PAT, ADMINISTRATION_DATE)  %>% 
+#  rename(ADMINISTRATION_DATE=ADMINISTRATION_DATE) %>% 
+#  mutate(marker="SACT")
+##Convert dates to same format
+#ovarian_SACT_record<-ovarian_SACT_record%>% 
+#  mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE))
+#
+##Bind datasetcleans to get one list of all dates in SACT and HES
+#alldates<-rbind(ovarian_HES_dates,ovarian_SACT_record)
+#
+##Pivot wider to get SACT and HES markers separated for each date
+#alldates<-alldates %>% 
+#  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+#  group_by(PSEUDO_PAT) %>% 
+#  mutate(row=row_number()) %>% 
+#  pivot_wider(names_from = marker, values_from = marker) 
+#
+##Where HES and SACT have the same date, fill by date
+#alldates<-alldates %>% 
+#  group_by(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+#  fill(HES,.direction="updown") %>% 
+#  fill(SACT,.direction="updown") %>% 
+#  ungroup()
+#
+#alldates %>% 
+#  distinct(PSEUDO_PAT, ADMINISTRATION_DATE, HES, SACT) %>% 
+#  ungroup() %>% 
+#  count(HES, SACT) #69109 records in HES only , 64924 in SACT only, 278597 in both
+```
+
+Then link THE whole list of HES chemotherapy records to the main ovarian cancer dataset clean to add in complete dates for patients. This will create a table including treatment dates but no drug administration data, as this is not recorded in HES.s 
+```{r}
+#Convert dates in ovarian datasetclean to date format
+#datasetclean<-datasetclean %>% 
+#  mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE))
+#
+##Join dates from HES to SACT records
+#linked<-datasetclean %>% 
+# right_join(alldates,by= c("PSEUDO_PAT", "ADMINISTRATION_DATE"))
+#
+##Retain individual drugs and treatment dates to create a complete list of SACT given. 
+#clean<-linked %>% 
+#  distinct(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP,.keep_all=T) %>% #Retain one line for each individual drug given on each treatment date. This will retain #HES records where drug is NA.
+#  arrange(PSEUDO_PAT,ADMINISTRATION_DATE)
+#
+#clean %>% 
+#  select(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP, SACT, HES)
+##This links the complete list of chemo dates to the current data in the SACT datasetclean. This represents a complete list of dates with treatments where #available. HES records will have a date but no drug listed as this information is not captured in HES.
+#
+#clean %>% 
+#  count(SACT, HES) #Count of number of records in both SACT and HES datasetcleans
+#
+#clean %>% 
+#  skimr::skim()
+```
+
+DO NOT RUN: Exclusion: if a patient's first-line therapy was in HES, remove. This is because it is does not contain drug-specific information required for planned studies.
+```{r}
+#firstlineinHES<-clean %>% 
+#  group_by(PSEUDO_PAT) %>% 
+#  mutate(index=min(ADMINISTRATION_DATE)) %>% 
+#  mutate(firstline=ifelse(index==ADMINISTRATION_DATE&is.na(DRUG_GROUP),1,NA)) %>% 
+#  fill(firstline,.direction="updown") %>% 
+#  filter(firstline==1) 
+#
+#firstlineinHES%>% 
+#  count(PSEUDO_PAT)#n=5,575 excluded because first SACT is in HES without drug detail
+#
+##Remove those with unknown record in HES
+#clean<-clean %>% 
+#  group_by(PSEUDO_PAT) %>% 
+#  mutate(index=min(ADMINISTRATION_DATE)) %>% 
+#  mutate(firstline=ifelse(index==ADMINISTRATION_DATE&is.na(DRUG_GROUP),1,NA)) %>% 
+#  fill(firstline,.direction="updown") %>% 
+#  filter(is.na(firstline)) %>% 
+#  ungroup()
+#
+#clean %>% 
+#  count(PSEUDO_PAT) #n=20,295
+#
+#clean %>% 
+#  skimr::skim()
+```
+
+
+Link performance status. This is contained in the CYCLE tables:
+```{r}
+cycle_new<-SACTCYCLENEW_2019 %>% 
+ #select(PSEUDO_PAT, PSEUDO_ENCORE_TUMOUR_ID) %>% 
+  rename(PSEUDO_TUMOURID=PSEUDO_ENCORE_TUMOUR_ID) %>% #rename as per linkage document to allow linkage to the main cohort
+  select(PSEUDO_PAT,PSEUDO_TUMOURID, PERF_STAT_START_OF_CYCLE_ADULT)%>% 
+  rename(PS=PERF_STAT_START_OF_CYCLE_ADULT)
+
+cycle_old<-SACTCYCLEOLD_2019 %>% 
+ #select(PSEUDO_PAT, PSEUDO_ENCORE_TUMOUR_ID) %>% 
+  rename(PSEUDO_TUMOURID=PSEUDO_MERGED_TUMOUR_ID) %>% #rename as per linkage document to allow linkage to the main cohort
+  rename(PSEUDO_PAT=PSEUDO_MERGED_PATIENT_ID) %>% #rename as per linkage document to allow linkage to the main cohort
+  select(PSEUDO_PAT,PSEUDO_TUMOURID, PERF_STAT_START_OF_CYCLE_CLEAN) %>% 
+  rename(PS=PERF_STAT_START_OF_CYCLE_CLEAN)
+
+#Rbind the cycle data
+PS_data<-rbind(cycle_new,cycle_old)
+
+PS_data %>%
+  select(PS) %>% 
+  skimr::skim()
+#PS 69.4% complete
+
+PS_data<-PS_data %>% 
+  group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
+  fill(PS, .direction = "updown") %>% 
+  ungroup()
+
+
+
+#Right_join to the main datasetclean
+
+
+dataset<-PS_data %>% 
+  right_join(datasetclean, by = c("PSEUDO_PAT", "PSEUDO_TUMOURID")) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP,.keep_all=T) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE)
+
+dataset %>% 
+  select(PS) %>% 
+  skimr::skim()
+#PS 58.33 complete after linkage
+```
+
+
+
+Data cleaning: mutate AGE where missing
+```{r}
+dataset$ref<-lubridate::year(dataset$ADMINISTRATION_DATE)
+
+#Age was recalculated where missing due to missing TUMOURID. This was calculated as difference between DOB and date of treatment.
+dataset<-dataset %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  mutate(YEAR_DOB=as.numeric(YEAR_DOB)) %>% 
+  #group_by(PSEUDO_PAT) %>% 
+  mutate(AGE=ifelse(is.na(AGE),ref-YEAR_DOB, AGE)) %>% 
+  ungroup() %>% 
+  select(-ref)
+
+dataset %>% 
+  skimr::skim()#Age 100% complete.
+
+ dataset %>% 
+  filter(str_detect(SITE_ICD10_O2, "C56|C48|C57")) %>% 
+  count(PSEUDO_PAT)
+
+
+ patient_table %>% 
+  filter(PSEUDO_PAT=="100019")
+
+tumour_table %>% 
+  filter(PSEUDO_PAT=="100019")
+
+dataset %>% 
+  filter(PSEUDO_PAT=="100019")
+
+all_sact %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% #two records of trastuzumab with different administration routes - these were removed when keeping one line per drug per date
+  filter(PSEUDO_PAT=="100019")
+```
+
+Fill performance status by PSEUD0_PAT AND TUMOURID. This operation allows for the closest PS value to be used in the analysis and to be incorporated into multivariable analyses. This brings in PS values within the treatment course where they are recorded to fill missing data.
+```{r}
+dataset<-dataset %>% 
+  group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% #Fill within the course of treatment
+  fill(PS, .direction = "updown") %>% 
+  ungroup()
+       
+dataset %>% 
+  select(PS) %>% 
+  skimr::skim()#n=58.33%
+```
+
+
+
+
+Merge to IMD table:
+```{r}
+ deprivation_table<-read_csv(
+  "deprivation_table.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+dataset<-deprivation_table %>% 
+  select(-PSEUDO_TUMOURID) %>% 
+  right_join(dataset,by="PSEUDO_PAT")
+```
+
+Link trust codes to get regional information
+```{r}
+trustcodes <- 
+  read_csv("trust_codes.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+dataset<-trustcodes %>% 
+  rename(ORGANISATION_CODE_OF_PROVIDER=Code) %>% 
+  rename(CENTRETYPE=DGH) %>% 
+  mutate(CENTRETYPE=ifelse(CENTRETYPE=="N","DGH", "ACADEMIC")) %>% 
+  rename(REGION="Commissioning region") %>% 
+  select(REGION , ORGANISATION_CODE_OF_PROVIDER, CENTRETYPE) %>% 
+  distinct(ORGANISATION_CODE_OF_PROVIDER,.keep_all=T) %>% 
+  right_join(dataset, by = "ORGANISATION_CODE_OF_PROVIDER")
+```
+
+Fill patient characteristic fields to complete data where HES records have been added:
+```{r}
+dataset %>%  
+  skimr::skim()
+
+dataset<-dataset %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(MONTH_DOB,.direction = "updown") %>% 
+  fill(IMD2015_1,.direction = "updown") %>% 
+  fill(IMD2004,.direction = "updown") %>% 
+  fill(IMD2007,.direction = "updown") %>% 
+  fill(IMD2010,.direction = "updown") %>% 
+  fill(IMD2015,.direction = "updown") %>% 
+  fill(REGION,.direction = "updown") %>% 
+  fill(CENTRETYPE,.direction = "updown") %>% 
+  fill(YEAR_DOB,.direction = "updown") %>% 
+  fill(SEX,.direction = "updown") %>% 
+  fill(ETHNICITY,.direction = "updown") %>% 
+  fill(ETHNICITYNAME,.direction = "updown") %>% 
+  fill(VITALSTATUS,.direction = "updown") %>% 
+  fill(VITALSTATUSDATE,.direction = "updown") %>% 
+  fill(DIAGNOSISDATEBEST,.direction = "updown") %>% 
+  fill(AGE,.direction = "updown") %>% 
+  fill(SITE_ICD10_O2,.direction = "updown") %>% 
+  fill(MORPH_ICD10_O2,.direction = "updown") %>% 
+  fill(BASISOFDIAGNOSIS,.direction = "updown") %>% 
+  fill(SITE_ICD10_O2,.direction = "updown") %>% 
+  fill(SITE_CODED,.direction = "updown") %>% 
+  fill(SITE_CODED_DESC,.direction = "updown") %>% 
+  fill(CODING_SYSTEM,.direction = "updown") %>% 
+  fill(CODING_SYSTEM_DESC,.direction = "updown") %>% 
+  fill(MORPH_CODED,.direction = "updown") %>% 
+  fill(BEHAVIOUR_ICD10_O2,.direction = "updown") %>% 
+  fill(BEHAVIOUR_CODED,.direction = "updown") %>% 
+  fill(BEHAVIOUR_CODED_DESC,.direction = "updown") %>% 
+  fill(HISTOLOGY_CODED_DESC,.direction = "updown") %>% 
+  fill(HISTOLOGY_CODED,.direction = "updown") %>% 
+  fill(GRADE,.direction = "updown") %>% 
+  fill(TUMOURSIZE,.direction = "updown") %>% 
+  fill(FIGO_,.direction = "updown") %>% 
+  fill(STAGE_BEST,.direction = "updown") %>% 
+  fill(STAGE_BEST_SYSTEM,.direction = "updown") %>% 
+  ungroup()
+
+dataset %>% 
+  skimr::skim()
+
+dataset %>% 
+  arrange(PSEUDO_PAT,ADMINISTRATION_DATE)
+```
+Write skimr to summarise data completeness
+```{r}
+dataset_skimr<-dataset %>% 
+  ungroup() %>% 
+  skimr::skim()
+
+dataset %>% 
+  count(PSEUDO_PAT)
+
+dataset_skimr%>% 
+  write_csv("ovarian_data_completeness.csv")
+```
+
+Write final dataset:
+```{r}
+dataset %>% 
+  count(PSEUDO_PAT) #n=25,870
+
+dataset %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE)
+
+dataset %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  write_csv("ovarian_cohort20NOV.csv")
+```
+
+Descriptives of the linked dataset:
+```{r}
+library(gtsummary)
+SUMMARYTABLE<-dataset %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI, PS, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE) %>% 
+  tbl_summary(by=NULL) %>% 
+  add_n()
+
+SUMMARYTABLE %>% 
+  as_gt() %>% 
+  gt::gtsave("ovarian_SACT_cohort_summary_table.docx")
+```
+
+Compare characteristics of the ovarian NCRAS cohort to the SACT linked cohort
+```{r}
+sact_cohort<-mergedtable %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(SACT="SACT - YES")
+
+ncras_cohort<-CAS_patient_tumour_link %>% 
+  filter(str_detect(SITE_ICD10_O2,"C56|C57|C48")) %>% 
+    distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(SACT="SACT - NO") %>% 
+  mutate(AGE=as.numeric(AGE))
+
+sact_cohort<-sact_cohort %>% 
+  select(AGE,AGE2, SEX, ETHNICITYNAME, VITALSTATUSDATE, SITE_ICD10_O2, STAGE_BEST_CLEAN, IMD2015_1, SACT)
+
+ncras_cohort$AGE2<-cut(ncras_cohort$AGE, breaks=c(0,50,60,70,150))
+ 
+ncras_cohort %>% 
+  count(STAGE_BEST)
+
+ncras_cohort<-ncras_cohort %>% 
+  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1A|1a"),"1A", NA)) %>% 
+ mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1B|1b"),"1B", STAGE_BEST_CLEAN)) %>% 
+mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1C|1c"),"1C", STAGE_BEST_CLEAN)) %>% 
+
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="2","2", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="3","3", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="4","4", STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2A|2a"),'2A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2B|2b"),'2B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2c|2C"),'2C', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3B|3b"),'3B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3C|3c"),'3C', STAGE_BEST_CLEAN)) %>%
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4A|4a"),'4A', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4B|4b"),'4B', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4C|4c"),'4C', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4S"),'4', STAGE_BEST_CLEAN)) %>% 
+          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"NA|X|U"),NA, STAGE_BEST_CLEAN)) %>%
+   mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1")&is.na(STAGE_BEST_CLEAN),"1", STAGE_BEST_CLEAN)) %>% 
+
+          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="?",NA, STAGE_BEST_CLEAN))
+
+ncras_cohort %>% 
+  count(STAGE_BEST_CLEAN)
+
+ncras_cohort<-ncras_cohort%>% 
+  ungroup() %>% 
+mutate(ETHNICITYNAME = recode(ETHNICITYNAME,
+                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
+                                'ASIAN BANGLADESHI' = "Asian",
+                                'ASIAN INDIAN' = "Asian",
+                                'ASIAN PAKISTANI' = "Asian",
+                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
+                                'BLACK AFRICAN' = "Black",
+                                'BLACK CARIBBEAN' = "Black",
+                                'ANY OTHER BLACK BACKGROUND' = "Black",
+                                'MIXED WHITE AND ASIAN' = "Mixed Race",
+                                'ANY OTHER MIXED BACKGROUND' = "Mixed Race",
+                                'MIXED WHITE AND BLACK AFRICAN' = "Mixed Race",
+                                'MIXED WHITE AND BLACK CARIBBEAN' = "Mixed Race",
+                                'CHINESE' = "Asian",
+                                'WHITE' = "White",
+                                'WHITE BRITISH' = "White",
+                                'WHITE IRISH' = "White",
+                                'ANY OTHER WHITE BACKGROUND' = "White",
+                                'NOT KNOWN' = "Unknown",
+                                'NOT STATED' = "Unknown",
+                                'ANY OTHER ETHNIC GROUP' = "Other",
+                                ))
+
+
+ncras_cohort<-ncras_cohort%>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C56"),"C56", SITE_ICD10_O2)) %>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C48"),"C48", SITE_ICD10_O2)) %>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C51"),"C51", SITE_ICD10_O2)) %>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C52"),"C52", SITE_ICD10_O2)) %>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C53"),"C53", SITE_ICD10_O2)) %>% 
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C54"),"C54", SITE_ICD10_O2)) %>%
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C57"),"C57", SITE_ICD10_O2)) %>%
+  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C55"),"C55", SITE_ICD10_O2)) %>% 
+  select(-(IMD2004:IMD2015))
+
+ncras_cohort<-deprivation_table%>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  merge(ncras_cohort, by = "PSEUDO_PAT")
+
+
+
+ncras_cohort<-ncras_cohort %>%
+  rename(IMD2015_1=IMD2015_1.x) %>% 
+   select(PSEUDO_PAT,AGE,AGE2, SEX, ETHNICITYNAME, VITALSTATUSDATE, SITE_ICD10_O2, STAGE_BEST_CLEAN, IMD2015_1, SACT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+tableone<-rbind(sact_cohort,ncras_cohort) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(2:10,-VITALSTATUSDATE, -PSEUDO_PAT) %>% 
+  ungroup() %>% 
+  select(-PSEUDO_PAT) %>% 
+  tbl_summary(by="SACT") %>% 
+  add_overall() %>% 
+  add_p()
+
+
+
+tableone %>%
+  as_gt() %>% 
+  gt::gtsave("tableone_comparing_NCRD_SACT.docx")
+```
+
+Data descriptives of all datasets:
+```{r}
+sact_cohort<-sact_cohort %>% 
+  mutate(`Treatment date`=as.Date(ADMINISTRATION_DATE)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+sact_cohort$datemonth<-format(sact_cohort$`Treatment date`, "%Y")
+```
+
+
+```{r}
+ggplot(data=sact_cohort, aes(x=datemonth))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment date distribution (SACT dataset)", bins =30)+theme(plot.title=element_text(hjust=0.5))+ylab(" ")+xlab("Year")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))
+
+sact_cohort<-sact_cohort %>% 
+  mutate(AGE=as.numeric(AGE))
+
+ggplot(data=sact_cohort, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
+
+
+
+ggplot(data=NCRD, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (NCRD dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
+
+gghistogram(sact_cohort$BMI,y="count", ylab="Number of patients",xlab="Body mass index", width=0.8, fill="darkgreen", title = "Body mass index distribution (SACT)", bins =150,add="median") +theme(plot.title=element_text(hjust=0.5))
+
+
+ggplot(data=sact_cohort, aes(x=IMD2015_1))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Index of multiple deprivation distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.4))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())
+
+
+ggplot(data=sact_cohort, aes(x=STAGE_BEST_CLEAN))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="FIGO staging (SACT dataset)")+theme(plot.title=element_text(hjust=0.4))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())
+
+NCRD %>% 
+  count(AGE)
+```
+
+Check NCRAS diagnosis dates and plot over time. This shows the spread of data.
+```{r}
+NCRAS_diagnoses<-tumour_table %>% 
+  mutate(DIAGNOSISDATEBEST=epiyear(dmy(DIAGNOSISDATEBEST)))
+
+hist(NCRAS_diagnoses$DIAGNOSISDATEBEST)
+
+#Plot all NCRAS diagnoses by year
+NCRAS_all_diagnoses_2012_2022<-gghistogram(NCRAS_diagnoses$DIAGNOSISDATEBEST,y="count", ylab=FALSE, xlim=c(1980,2022), fill="darkgreen", xlab="Year", bins =40, title = "Cancer diagnoses by year")+theme(plot.title=element_text(hjust=0.5))
+NCRAS_all_diagnoses_2012_2022<-gghistogram(NCRAS_diagnoses$DIAGNOSISDATEBEST,y="count", ylab=FALSE, xlim=c(2000,2022), fill="darkgreen", xlab="Year", bins =80, title = "Cancer diagnoses by year")+theme(plot.title=element_text(hjust=0.5))
+```
