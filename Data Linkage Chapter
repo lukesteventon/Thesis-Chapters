@@ -667,22 +667,28 @@ excluded_patients<-dataset %>%
 excluded_patients%>% 
   count(PSEUDO_PAT) #n=4,968 patients with missing diagnostic information due to missing TUMOURID or otherwise missing fields
 #Write table for dataset before patients are exclued by missing TUMOURID
+library(gtsummary)
+
 dataset %>%
-distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
+distinct(PSEUDO_PAT,.keep_all=T) %>%
+  mutate(AGE=as.numeric(AGE)) %>% 
+  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n() %>% 
-  write_csv("patient_characteristics_before_exclusion.csv")
+  as_gt() %>% 
+  gt::gtsave("characteristics_before_exclusion.docx")
 
 
 
 #Write table for patients excluded due to TUMOURID
 excluded_patients%>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
+    mutate(AGE=as.numeric(AGE)) %>% 
   select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n() %>% 
-  write_csv("excluded_patient_characteristics.csv")
+  as_gt() %>% 
+  gt::gtsave("excluded_patient_characteristics.docx")
   
 
 #Remove these patients from the dataset
@@ -810,7 +816,7 @@ datasetclean<-datasetclean %>%
 
 datasetclean %>% 
   select(BMI) %>% 
-  skimr::skim() #BMI 84.9% complete
+  skimr::skim() #BMI 96.18% complete
 ```
 
 5iv): Data cleaning:
@@ -1464,10 +1470,7 @@ PS_data<-PS_data %>%
   ungroup()
 
 
-
 #Right_join to the main datasetclean
-
-
 dataset<-PS_data %>% 
   right_join(datasetclean, by = c("PSEUDO_PAT", "PSEUDO_TUMOURID")) %>% 
   distinct(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP,.keep_all=T) %>% 
