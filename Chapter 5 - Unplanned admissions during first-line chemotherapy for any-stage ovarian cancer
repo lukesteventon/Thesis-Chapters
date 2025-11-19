@@ -779,7 +779,7 @@ regression_data2<-regression_data %>%
 regression_data2$surgery<-as.factor(regression_data2$surgery)
 regression_data2$surgery<-relevel(regression_data2$surgery, ref = "PDS")
 regression_data2$BMI2<-as.factor(regression_data2$BMI2)
-regression_data2$BMI2<-relevel(regression_data2$BMI2, ref = "[0,18.5)")
+regression_data2$BMI2<-relevel(regression_data2$BMI2, ref = "[18.5,25)")
 ```
 
 
