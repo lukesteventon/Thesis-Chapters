@@ -1648,6 +1648,8 @@ SUMMARYTABLE<-dataset %>%
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
   select(AGE, ETHNICITYNAME, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI, PS, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n()
@@ -1657,116 +1659,6 @@ SUMMARYTABLE %>%
   gt::gtsave("ovarian_SACT_cohort_summary_table.docx")
 ```
 
-Compare characteristics of the ovarian NCRAS cohort to the SACT linked cohort
-```{r}
-sact_cohort<-mergedtable %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  mutate(SACT="SACT - YES")
-
-ncras_cohort<-CAS_patient_tumour_link %>% 
-  filter(str_detect(SITE_ICD10_O2,"C56|C57|C48")) %>% 
-    distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  mutate(SACT="SACT - NO") %>% 
-  mutate(AGE=as.numeric(AGE))
-
-sact_cohort<-sact_cohort %>% 
-  select(AGE,AGE2, SEX, ETHNICITYNAME, VITALSTATUSDATE, SITE_ICD10_O2, STAGE_BEST_CLEAN, IMD2015_1, SACT)
-
-ncras_cohort$AGE2<-cut(ncras_cohort$AGE, breaks=c(0,50,60,70,150))
- 
-ncras_cohort %>% 
-  count(STAGE_BEST)
-
-ncras_cohort<-ncras_cohort %>% 
-  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1A|1a"),"1A", NA)) %>% 
- mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1B|1b"),"1B", STAGE_BEST_CLEAN)) %>% 
-mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1C|1c"),"1C", STAGE_BEST_CLEAN)) %>% 
-
-          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="2","2", STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="3","3", STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="4","4", STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2A|2a"),'2A', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2B|2b"),'2B', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"2c|2C"),'2C', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3A|3a"),'3A', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3B|3b"),'3B', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"3C|3c"),'3C', STAGE_BEST_CLEAN)) %>%
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4A|4a"),'4A', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4B|4b"),'4B', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4C|4c"),'4C', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"4S"),'4', STAGE_BEST_CLEAN)) %>% 
-          mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"NA|X|U"),NA, STAGE_BEST_CLEAN)) %>%
-   mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST,"1")&is.na(STAGE_BEST_CLEAN),"1", STAGE_BEST_CLEAN)) %>% 
-
-          mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="?",NA, STAGE_BEST_CLEAN))
-
-ncras_cohort %>% 
-  count(STAGE_BEST_CLEAN)
-
-ncras_cohort<-ncras_cohort%>% 
-  ungroup() %>% 
-mutate(ETHNICITYNAME = recode(ETHNICITYNAME,
-                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
-                                'ASIAN BANGLADESHI' = "Asian",
-                                'ASIAN INDIAN' = "Asian",
-                                'ASIAN PAKISTANI' = "Asian",
-                                'ANY OTHER ASIAN BACKGROUND' = "Asian",
-                                'BLACK AFRICAN' = "Black",
-                                'BLACK CARIBBEAN' = "Black",
-                                'ANY OTHER BLACK BACKGROUND' = "Black",
-                                'MIXED WHITE AND ASIAN' = "Mixed Race",
-                                'ANY OTHER MIXED BACKGROUND' = "Mixed Race",
-                                'MIXED WHITE AND BLACK AFRICAN' = "Mixed Race",
-                                'MIXED WHITE AND BLACK CARIBBEAN' = "Mixed Race",
-                                'CHINESE' = "Asian",
-                                'WHITE' = "White",
-                                'WHITE BRITISH' = "White",
-                                'WHITE IRISH' = "White",
-                                'ANY OTHER WHITE BACKGROUND' = "White",
-                                'NOT KNOWN' = "Unknown",
-                                'NOT STATED' = "Unknown",
-                                'ANY OTHER ETHNIC GROUP' = "Other",
-                                ))
-
-
-ncras_cohort<-ncras_cohort%>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C56"),"C56", SITE_ICD10_O2)) %>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C48"),"C48", SITE_ICD10_O2)) %>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C51"),"C51", SITE_ICD10_O2)) %>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C52"),"C52", SITE_ICD10_O2)) %>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C53"),"C53", SITE_ICD10_O2)) %>% 
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C54"),"C54", SITE_ICD10_O2)) %>%
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C57"),"C57", SITE_ICD10_O2)) %>%
-  mutate(SITE_ICD10_O2=ifelse(str_detect(SITE_ICD10_O2,"C55"),"C55", SITE_ICD10_O2)) %>% 
-  select(-(IMD2004:IMD2015))
-
-ncras_cohort<-deprivation_table%>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  merge(ncras_cohort, by = "PSEUDO_PAT")
-
-
-
-ncras_cohort<-ncras_cohort %>%
-  rename(IMD2015_1=IMD2015_1.x) %>% 
-   select(PSEUDO_PAT,AGE,AGE2, SEX, ETHNICITYNAME, VITALSTATUSDATE, SITE_ICD10_O2, STAGE_BEST_CLEAN, IMD2015_1, SACT) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T)
-
-tableone<-rbind(sact_cohort,ncras_cohort) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(2:10,-VITALSTATUSDATE, -PSEUDO_PAT) %>% 
-  ungroup() %>% 
-  select(-PSEUDO_PAT) %>% 
-  tbl_summary(by="SACT") %>% 
-  add_overall() %>% 
-  add_p()
-
-
-
-tableone %>%
-  as_gt() %>% 
-  gt::gtsave("tableone_comparing_NCRD_SACT.docx")
-```
 
 Data descriptives of all datasets:
 ```{r}
