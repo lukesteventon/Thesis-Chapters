@@ -1717,39 +1717,47 @@ mutate(BMI=as.numeric(BMI))
         
 dataset$BMI2<-cut(dataset$BMI, breaks=c(0,18.5,25,30,40,99), right = FALSE)
 
+dataset<-dataset %>% 
+  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
+  mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST))
+
+
 SUMMARYTABLE<-dataset %>% 
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
-  select(AGE,AGE2, ethnicitygroup, ETHNICITY2, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI,BMI2, PS,HISTOLOGY_CODED_DESC, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE) %>% 
+  select(AGE,AGE2, ethnicitygroup, ETHNICITY2, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI,BMI2, PS,HISTOLOGY_CODED_DESC, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE, ADMINISTRATION_DATE, DIAGNOSISDATEBEST) %>% 
   tbl_summary(by=NULL) %>% 
   add_n()
 
 SUMMARYTABLE %>% 
   as_gt() %>% 
   gt::gtsave("ovarian_SACT_cohort_summary_table.docx")
+
+dataset %>% 
+  select(ADMINISTRATION_DATE, DIAGNOSISDATEBEST) %>% 
+  summary()
+
+#ADMINISTRATION_DATE  DIAGNOSISDATEBEST   
+# Min.   :2012-03-26   Min.   :1989-01-23  
+# 1st Qu.:2015-04-27   1st Qu.:2013-09-16  
+# Median :2017-04-28   Median :2015-10-15  
+# Mean   :2017-04-06   Mean   :2015-09-02  
+# 3rd Qu.:2019-03-18   3rd Qu.:2017-10-26  
+# Max.   :2022-07-12   Max.   :2021-04-30
+
 ```
 
 
-Data descriptives of all datasets:
-```{r}
-sact_cohort<-sact_cohort %>% 
-  mutate(`Treatment date`=as.Date(ADMINISTRATION_DATE)) %>% 
-  mutate(AGE=as.numeric(AGE)) %>% 
-  mutate(BMI=as.numeric(BMI)) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T)
-
-sact_cohort$datemonth<-format(sact_cohort$`Treatment date`, "%Y")
-```
 
 
 ```{r}
-ggplot(data=sact_cohort, aes(x=datemonth))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment date distribution (SACT dataset)", bins =30)+theme(plot.title=element_text(hjust=0.5))+ylab(" ")+xlab("Year")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))
+ggplot(data=dataset, aes(x=datemonth))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment date distribution (SACT dataset)", bins =30)+theme(plot.title=element_text(hjust=0.5))+ylab(" ")+xlab("Year")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))
 
 sact_cohort<-sact_cohort %>% 
   mutate(AGE=as.numeric(AGE))
 
-ggplot(data=sact_cohort, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
+ggplot(data=sact_cohort, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y _continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
 
 
 
