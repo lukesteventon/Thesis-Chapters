@@ -97,12 +97,19 @@ cohort<-read_csv(
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL) 
+
+demographic_table<-cohort %>% 
+  select(PSEUDO_PAT, IMD2015_1, ETHNICITYNAME)%>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
 ```
 
 Check specified cohort file is correct - n=23,774 patients.
 ```{r Diagnosis}
 cohort %>% 
   count(PSEUDO_PAT) #n=23,774 
+
+cohort %>% 
+  skimr::skim()
 ```
 
 Count missingness of stage data:
@@ -196,7 +203,6 @@ n=[16,876 before exclusion
 1b: Exclusion remove drugs of non-interest: 
 N=4,935 excluded here:
 n=11,941 after exclusion.
-This also excludes patients who have PLD listed as their first regimen - this is okay because we want to preserve first-line platinum chemotherapy only.
 ```{r}
 ovariansurgerycohort %>% 
   count(PSEUDO_PAT) #n=16,876 patients in total
@@ -231,31 +237,33 @@ ovariansurgerycohort<-ovariansurgerycohort %>% #Then filter only patients who ha
 ovariansurgerycohort %>% 
     count(PSEUDO_PAT) #11,941
 ```
+DO NOT RUN
+EXCLUDED AS I DONT THINK THIS WILL AFFECT THE RESULTS AND IS NEEDLESSLY EXCLUDING PATIENTS
 n=11,941 patients before this exclusion
 2: If patient had any treatment before 2014, remove them as this interferes with the labeling of lines of therapy
 N=1,939 excluded
 n=10,002 after
 ```{r}
-ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=11,941 patients
-
-ovariansurgerycohort<-ovariansurgerycohort %>% 
-  mutate(studyperiodexclusion=ifelse(ADMINISTRATION_DATE<"2014-01-01",1,NA)) %>% 
-  group_by(PSEUDO_PAT) %>% 
-  fill(studyperiodexclusion, .direction="updown") %>% 
-  filter(is.na(studyperiodexclusion))
-
-ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=10,002 patients
+#ovariansurgerycohort %>% 
+#  count(PSEUDO_PAT) #n=11,941 patients
+#
+#ovariansurgerycohort<-ovariansurgerycohort %>% 
+#  mutate(studyperiodexclusion=ifelse(ADMINISTRATION_DATE<"2014-01-01",1,NA)) %>% 
+#  group_by(PSEUDO_PAT) %>% 
+#  fill(studyperiodexclusion, .direction="updown") %>% 
+#  filter(is.na(studyperiodexclusion))
+#
+#ovariansurgerycohort %>% 
+#  count(PSEUDO_PAT) #n=10,002 patients
 ```
 
-n=10,002 before
+n=11,941 before
 Calculate time from diagnosis to first SACT and exclude those not treated within 90 days. This is the expected time frame based on Shibani's comment.
-n=8,658 after
-n=1,344 excluded
+n=10,027 after
+n=1,914 excluded
 ```{r}
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=10,002
+  count(PSEUDO_PAT) #n=11,941
 
 
 ovariansurgerycohort<-ovariansurgerycohort %>%
@@ -268,16 +276,16 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
  filter(diagnosistotreat<91)
 
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=8,658
+  count(PSEUDO_PAT) #n=10,027
 ```
 
-n=8,658 before
+n=10,027 before
 2F: Exclude patients who have a record of SACT AFTER death:
-n=1 excluded 
-n=8,657 after
+n=5 excluded 
+n=10,022 after
 ```{r}
 ovariansurgerycohort %>%
-count(PSEUDO_PAT)#n=8,658
+count(PSEUDO_PAT)#n=10,027
 
 ovariansurgerycohort<-ovariansurgerycohort %>%
   mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>% 
@@ -292,7 +300,7 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
    filter(is.na(exclude))
 
 ovariansurgerycohort %>%
-count(PSEUDO_PAT) #n=8,657
+count(PSEUDO_PAT) #n=10,022
 ```
 
 2bi: Bring in HES records of chemo to incorporate any additional chemotherapy that is not recorded in SACT:
@@ -345,12 +353,12 @@ ovariansurgerycohort<-rbind(cohort_dates,HES_dates) %>% #create list of all SACT
 ```
 
 EXCLUSION: remove patients who have chemo records in HES from more than 3 months before the SACT dataset. This means they had chemo and that the first records are not neessarily first line treatment:
-m=8,657 before
-n=8,534 after
-n=123 excluded because first chemo is in HES and treatment data not given
+m=n=10,022 before
+n=9,893 after
+n=129 excluded because first chemo is in HES and treatment data not given
 2biii:  Need to adjust for chemo that is not related to the SACT record:
 ```{r}
-ovariansurgerycohort %>% count(PSEUDO_PAT)#n=8,657
+ovariansurgerycohort %>% count(PSEUDO_PAT)#n=n=10,022
 
 cohort_dates<-cohort_dates %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -366,13 +374,13 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   fill(exclusion_first_line,.direction="updown") %>% 
   filter(is.na(exclusion_first_line)) %>% ungroup() #Filter out HES chemo records more than 90 days before as this is presumably not related to the first-line therapy
 
-ovariansurgerycohort %>% count(PSEUDO_PAT) #8,534, n=123 excluded
+ovariansurgerycohort %>% count(PSEUDO_PAT) #9,893, n=129 excluded
 ```
 
 
 2bii: Define lines of therapy. Start with line=1 and flag as new regimen when days between SACT is 120 days or more.
 ```{r}
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=8,534
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=9,893
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -399,15 +407,15 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   group_by(PSEUDO_PAT) %>% 
   fill(lineoftherapy,.direction = "down")
 
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=8,534
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=9,893
 ```
 
 n=8,534 before this exclusion
 Exclude patients who have been labelled with PLD as first-line.
-n=803 patients excluded
-n=7,731 after this exclusion
+n=1,029 patients excluded
+n=8,864 after this exclusion
 ```{r}
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=8,534
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=9,893
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
@@ -416,14 +424,14 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   select(PSEUDO_PAT) %>% 
   merge(ovariansurgerycohort, by = "PSEUDO_PAT") 
 
-ovariansurgerycohort %>% count(PSEUDO_PAT) #n=7,731
+ovariansurgerycohort %>% count(PSEUDO_PAT) #n=8,864
 ```
 
 Flag platinum rechallenge where time between carboplatin and treatments are less than 180 days apart.
 ```{r}
 ovariansurgerycohort %>%
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=7,731
+  count(PSEUDO_PAT) #n=8,864
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   mutate(DAYSFROMPREVIOUSADMIN=ifelse(is.na(DAYSFROMPREVIOUSADMIN)|DAYSFROMPREVIOUSADMIN==0,NA,DAYSFROMPREVIOUSADMIN)) %>% 
@@ -441,7 +449,7 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
 
 ovariansurgerycohort %>%
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=7,731
+  count(PSEUDO_PAT) #n=8,864
 ```
 ################
 THIS SECTION LINKS SURGICAL DATA WHERE IT CAN BE FOUND IN HES AND NCRD RECORDS:
@@ -454,7 +462,7 @@ cohort<-ovariansurgerycohort %>%
 ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT) %>% 
   merge(HESAPC,by = "PSEUDO_PAT") %>% 
-  count(PSEUDO_PAT)#N=7,692 of 7,731 ovarian patients in the HES APC data out (99.9%)
+  count(PSEUDO_PAT)#N=8,793 of 8,864 ovarian patients in the HES APC data out (99.9%)
 
 HESAPC %>%
   filter(str_detect(OPERTN_01, "q|Q")) %>% 
@@ -465,7 +473,7 @@ hessurgeries<-HESAPC %>%
   filter(str_detect(OPERTN_01, "q07|q08|q22|Q07|Q08|Q22")) #Q07/Q08 hysterectomy, Q22 bilateral salpingoophrectomy
 
 hessurgeries %>% 
-  count(PSEUDO_PAT)#N=4,555 patients with records of SURGERY in HES (of the 7,731 total ovarian after exclusions)
+  count(PSEUDO_PAT)#N=5,240 patients with records of SURGERY in HES (of the 7,731 total ovarian after exclusions)
 
 hessurgeries<-hessurgeries %>% 
   select(PSEUDO_PAT, OPERTN_01, ADMIDATE,OPDATE_01) %>% 
@@ -480,20 +488,20 @@ hessurgeries<-hessurgeries %>%
 ```{r}
 ovariansurgerycohort %>%
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=7,731 patients in total in the cohort after exclusions
+  count(PSEUDO_PAT) #n=8,864 patients in total in the cohort after exclusions
 
 #Define surgeries that are relevant from NCRAS
 treatment_table %>% 
   merge(cohort,by="PSEUDO_PAT") %>% 
   filter(str_detect(EVENTDESC,"Surgery|surgery")) %>% 
   filter(str_detect(OPCS4_NAME, "Hysterectomy|hysterectomy|HYSTERECTOMY|Salping|salping|SALPINGOO|Bilateral salp|BILATERAL SALP|bilateral salp")) %>% 
-  count(PSEUDO_PAT) #n=4,419/7,731 patients with any surgery recorded by these terms of the 13144 eligible patients have a record in the NCRD data
+  count(PSEUDO_PAT) #n=5,069/8,864 patients with any surgery recorded by these terms of the 13144 eligible patients have a record in the NCRD data
 
 surgerytableNCRAS<-treatment_table %>% 
   merge(cohort,by="PSEUDO_PAT") %>% 
   filter(str_detect(EVENTDESC,"Surgery|surgery")) %>% 
   filter(str_detect(OPCS4_NAME, "Hysterectomy|hysterectomy|HYSTERECTOMY|Salping|salping|SALPINGOO|Bilateral salp|BILATERAL SALP|bilateral salp")) %>% 
-  distinct(PSEUDO_PAT, EVENTDATE,.keep_all=T) #4,513/7,731 patients have a record of surgery in the NCRAS registry
+  distinct(PSEUDO_PAT, EVENTDATE,.keep_all=T) #5,240/8,864 patients have a record of surgery in the NCRAS registry
 
 #Merge NCRAS and HES surgery records
 surgerytableNCRAS<-surgerytableNCRAS %>% 
@@ -506,29 +514,29 @@ hessurgeries<-hessurgeries %>%
   arrange(PSEUDO_PAT, EVENTDATE) %>% 
   distinct(PSEUDO_PAT,.keep_all=T)
 
-hessurgeries %>% count(PSEUDO_PAT) #n=4,555 with HES record of hysterectomy/bilateral salpingoophrectomy
+hessurgeries %>% count(PSEUDO_PAT) #n=5,240 with HES record of hysterectomy/bilateral salpingoophrectomy
 
 allsurgeries<-rbind(surgerytableNCRAS,hessurgeries) %>% 
   distinct(PSEUDO_PAT, EVENTDATE, OPCS4_CODE)
 
-allsurgeries %>% count(PSEUDO_PAT) #n=4,861/7,731 patients with record of hysterectomy or bilateral salpinoophrectomy in the HES or NCRD data combined.
+allsurgeries %>% count(PSEUDO_PAT) #n=5,608/8,864 patients with record of hysterectomy or bilateral salpinoophrectomy in the HES or NCRD data combined.
 ```
 
 
 
 
 
-N=7,731 before this exclusion
-N=4,861 have a record of surgery in HES or NCRD
+N=8,864 before this exclusion
+N=5,608 have a record of surgery in HES or NCRD
 Filter for patients who receive surgery within 12 months of the study period:
-N=4843 received surgery from 01/01/2013 onwards
-N=3402 had their surgery before the study period and were excluded
+N=4,665 received surgery from 01/01/2013 onwards
+N=4,199 had their surgery before the study period and were excluded
 
-After this chunk: N=4843
+After this chunk: N=4,665
 ```{r}
-ovariansurgerycohort %>%ungroup() %>%  count(PSEUDO_PAT)#n=7,731 patients in the cohort
+ovariansurgerycohort %>%ungroup() %>%  count(PSEUDO_PAT)#n=8,864 patients in the cohort
 
-allsurgeries %>% count(PSEUDO_PAT) #n=4,861 patients with record of hysterectomy or bilateral salp
+allsurgeries %>% count(PSEUDO_PAT) #n=5,608 patients with record of hysterectomy or bilateral salp
 
 allsurgeries<-allsurgeries %>% 
   mutate(EVENTDATE=dmy(EVENTDATE)) %>% 
@@ -540,27 +548,27 @@ allsurgeries<-allsurgeries %>%
   distinct(PSEUDO_PAT,.keep_all=T)
 
 allsurgeries %>% 
-  count(PSEUDO_PAT) #n=4,197 patients had surgery within study period 
+  count(PSEUDO_PAT) #n=4,665 patients had surgery within study period 
 
 allsurgeries<-allsurgeries %>% 
  filter(!is.na(EVENTDATE)) #Filter patients where there is no surgery date.
       
 allsurgeries %>% 
-  count(PSEUDO_PAT) #n=41,97, n=0 excluded for having no surgery date
+  count(PSEUDO_PAT) #n=4,665, n=0 excluded for having no surgery date
  
 ovariansurgerycohort<-allsurgeries %>% 
   merge(ovariansurgerycohort, by ="PSEUDO_PAT")
 
 allsurgeries %>% 
-  count(PSEUDO_PAT)#n=4,197 patients with a surgery record link to SACT
+  count(PSEUDO_PAT)#n=4,665 patients with a surgery record link to SACT
 ```
 
-n=4,197 before
+n=4,665 before
 Define time from debulking surgery to adjuvant treatment:
-n=195 removed for not having received adjuvant chemo with 90 days of surgery
-n=4002 after excluding patients who do not have adjuvant chemo within 90 days of surgery
+n=231 removed for not having received adjuvant chemo with 90 days of surgery
+n=4,434 after excluding patients who do not have adjuvant chemo within 90 days of surgery
 ```{r}
-ovariansurgerycohort %>% count(PSEUDO_PAT) #n=4,197
+ovariansurgerycohort %>% count(PSEUDO_PAT) #n=4,665
 
 adjuvanttreatmenttime<-ovariansurgerycohort %>% 
   ungroup() %>% 
@@ -579,7 +587,7 @@ adjuvanttreatmenttime<-ovariansurgerycohort %>%
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   merge(adjuvanttreatmenttime, by = "PSEUDO_PAT") 
 
-ovariansurgerycohort %>% count(PSEUDO_PAT)# N=4002 patients are excluded who did not receive adjuvant treatment with 180 days of surgery
+ovariansurgerycohort %>% count(PSEUDO_PAT)# N=4,434 patients are excluded who did not receive adjuvant treatment with 180 days of surgery
 ```
 
 Then need to flag PDS or IDS treatment:
@@ -606,10 +614,10 @@ ovariansurgerycohort<-PDSIDS %>%
 
 ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  count(PDS,IDS) #n=1,713 patients had PDS only, n=2,289 had IDS
+  count(PDS,IDS) #n=1,861 patients had PDS only, n=2,573 had IDS
 
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=4,002 patients in total had surgery within 180 days of adjuvant chemotherapy. This includes htose who had neoadjuvant carbo/taxol chemotherapy before
+  count(PSEUDO_PAT) #n=4,434 patients in total had surgery within 180 days of adjuvant chemotherapy. This includes htose who had neoadjuvant carbo/taxol chemotherapy before
 
 ```
 
@@ -626,10 +634,12 @@ ovariansurgerycohort<-trust_codes %>%
   right_join(ovariansurgerycohort, by = "ORGANISATION_CODE_OF_PROVIDER")
 
 ovariansurgerycohort %>% 
-  count(CENTRE_TYPE) #no missing data
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(CENTRE_TYPE) #1/4,434 missing
 
 ovariansurgerycohort %>% 
-  count(`Commissioning region`) #no missing data
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(`Commissioning region`)#1/4,434 missing
 ```
 
 Assign surgical modality as one variable:
@@ -661,8 +671,8 @@ ovariansurgerycohort$modality<-as.factor(ovariansurgerycohort$modality)
 ovariansurgerycohort$modality<- relevel(ovariansurgerycohort$modality, ref = "PDS")
 ovariansurgerycohort$ETHNICITYNAME<-as.factor(ovariansurgerycohort$ETHNICITYNAME)
 ovariansurgerycohort<- ovariansurgerycohort %>% 
-  mutate(ETHNICITYCATEGORY=ifelse(ETHNICITYNAME=="White","White", "Non-white"))
-ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "White")
+  mutate(ETHNICITYCATEGORY=ifelse(ETHNICITYNAME=="WHITE","White", "Non-white"))
+ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "WHITE BRITISH")
 ```
 
 
@@ -671,7 +681,7 @@ ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME,
 ovariansurgerycohort %>% write_csv("surgery_final_cohort_08OCT24.csv")
 
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=4619
+  count(PSEUDO_PAT) #n=4,434
 ```
 
 Define surgery to adjuvant treatment time and fill for each patient. 
@@ -681,7 +691,7 @@ Assign time categories for each patient as per upgrade report protocol (<4 weeks
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   mutate(adjuvantbreak=as.numeric(adjuvantbreak))
 
-ovariansurgerycohort$adjuvantbreakcategory<-cut(ovariansurgerycohort$adjuvantbreak, breaks=c(0,57,181), right = FALSE)
+ovariansurgerycohort$adjuvantbreakcategory<-cut(ovariansurgerycohort$adjuvantbreak, breaks=c(0,43,181), right = FALSE)
 ```
 
 ```{r}
@@ -701,7 +711,7 @@ ovariansurgerycohort <- read_csv(
 #ovariansurgerycohort$PS<-cut(ovariansurgerycohort$PS, breaks=c(0,1,2,10), right = FALSE)
 ovariansurgerycohort$ETHNICITYNAME<-as.factor(ovariansurgerycohort$ETHNICITYNAME)
 
-ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "White")
+ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "WHITE BRITISH")
 #Create  list of included patients:
 filterlist<-ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT)
@@ -920,392 +930,7 @@ all_hes_data<-read_csv(
   col_select = NULL)
 ```
 
-Create a flag for each patient to define the year treatment started. The frailty score will be applied based on diagnoses in the 12 months start of chemotherapy:
-```{r}
-#ovariansurgerycohort<-ovariansurgerycohort %>% 
-#  group_by(PSEUDO_PAT) %>% 
-#  mutate(DATAYEAR=as.numeric(epiyear(DIAGNOSISDATEBEST))) %>% #Check this is assigning the year as "YYYY"
-#  ungroup()
-#
-#all_hes_data<-all_hes_data %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"2122"),2021,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"2021"),2020,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1920"),2019,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1819"),2018,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1718"),2017,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1617"),2016,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1516"),2015,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1415"),2014,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1314"),2013,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1213"),2012,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1112"),2011,DATAYEAR)) %>% 
-#  mutate(DATAYEAR=ifelse(str_detect(DATAYEAR,"1011"),2010,DATAYEAR))
-#
-##Merge HES with SACT by PSEUDO_PAT and DATAYEAR to get diagnoses within the year before treatment:
-#frailty_table<-ovariansurgerycohort %>% 
-#  mutate(index=min(ADMINISTRATION_DATE)) %>% 
-#  mutate(DATAYEAR=as.character(DATAYEAR)) %>% 
-#  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-#  select(PSEUDO_PAT,DATAYEAR) %>%
-#  merge(all_hes_data, by =c("PSEUDO_PAT", "DATAYEAR")) #Links all HES records to the cohort
-#
-#frailty_table %>% 
-#  count(PSEUDO_PAT) # N=4442 PATIENTS IN THE HES RECORDS with diagnositc info in the datayear of treatment
-```
 
-The next step is to assign the frailty scores based on ICD codes and assign membership to frailty groups as binary markers. 
-This chunk assigns a binary marker of diagnosis for each of the 109 codes described in Gilbert et al 2018. These binary markers are then used in a penalised logistic regression against the outcome of recorded performance status, to describe the relationship between icd code diagnoses and recorded PS. This will then be built back into the data to complete PS for those with missing data.
-```{r}
-#frailty_table2<-frailty_table %>% 
-#  group_by(PSEUDO_PAT) %>% 
-#  fill(everything()) %>% 
-#  mutate(
-#      icd_F00 = if_else(str_detect(DIAG4_01,"F00")|str_detect(DIAG4_02,"F00")|str_detect(DIAG4_03,"F00")|str_detect(DIAG4_04,"F00")|str_de#tect(DIAG4_05,"F00")|str_detect(DIAG4_06,"F00")|str_detect(DIAG4_07,"F00")|str_detect(DIAG4_08,"F00")|str_detect(DIAG4_09,"F00")|str_detec#t(DIAG4_10,"F00")|str_detect(DIAG4_11,"F00")|str_detect(DIAG4_12,"F00"), 1, NA),
-#      icd_G81 = if_else(str_detect(DIAG4_01,"G81")|str_detect(DIAG4_02,"G81")|str_detect(DIAG4_03,"G81")|str_detect(DIAG4_04,"G81")|str_de#tect(DIAG4_05,"G81")|str_detect(DIAG4_06,"G81")|str_detect(DIAG4_07,"G81")|str_detect(DIAG4_08,"G81")|str_detect(DIAG4_09,"G81")|str_detec#t(DIAG4_10,"G81")|str_detect(DIAG4_11,"G81")|str_detect(DIAG4_12,"G81"), 1, NA),
-#      icd_G30 = if_else(str_detect(DIAG4_01,"G30")|str_detect(DIAG4_02,"G30")|str_detect(DIAG4_03,"G30")|str_detect(DIAG4_04,"G30")|str_de#tect(DIAG4_05,"G30")|str_detect(DIAG4_06,"G30")|str_detect(DIAG4_07,"G30")|str_detect(DIAG4_08,"G30")|str_detect(DIAG4_09,"G30")|str_detec#t(DIAG4_10,"G30")|str_detect(DIAG4_11,"G30")|str_detect(DIAG4_12,"G30"), 1, NA),
-#      icd_I69 = if_else(str_detect(DIAG4_01,"I69")|str_detect(DIAG4_02,"I69")|str_detect(DIAG4_03,"I69")|str_detect(DIAG4_04,"I69")|str_de#tect(DIAG4_05,"I69")|str_detect(DIAG4_06,"I69")|str_detect(DIAG4_07,"I69")|str_detect(DIAG4_08,"I69")|str_detect(DIAG4_09,"I69")|str_detec#t(DIAG4_10,"I69")|str_detect(DIAG4_11,"I69")|str_detect(DIAG4_12,"I69"), 1, NA),
-#      icd_R29 = if_else(str_detect(DIAG4_01,"R29")|str_detect(DIAG4_02,"R29")|str_detect(DIAG4_03,"R29")|str_detect(DIAG4_04,"R29")|str_de#tect(DIAG4_05,"R29")|str_detect(DIAG4_06,"R29")|str_detect(DIAG4_07,"R29")|str_detect(DIAG4_08,"R29")|str_detect(DIAG4_09,"R29")|str_detec#t(DIAG4_10,"R29")|str_detect(DIAG4_11,"R29")|str_detect(DIAG4_12,"R29"), 1, NA),
-#      icd_N39 = if_else(str_detect(DIAG4_01,"N39")|str_detect(DIAG4_02,"N39")|str_detect(DIAG4_03,"N39")|str_detect(DIAG4_04,"N39")|str_de#tect(DIAG4_05,"N39")|str_detect(DIAG4_06,"N39")|str_detect(DIAG4_07,"N39")|str_detect(DIAG4_08,"N39")|str_detect(DIAG4_09,"N39")|str_detec#t(DIAG4_10,"N39")|str_detect(DIAG4_11,"N39")|str_detect(DIAG4_12,"N39"),  1, NA),
-#
-#      icd_W19 = if_else(str_detect(DIAG4_01,"W19")|str_detect(DIAG4_02,"W19")|str_detect(DIAG4_03,"W19")|str_detect(DIAG4_04,"W19")|str_de#tect(DIAG4_05,"W19")|str_detect(DIAG4_06,"W19")|str_detect(DIAG4_07,"W19")|str_detect(DIAG4_08,"W19")|str_detect(DIAG4_09,"W19")|str_detec#t(DIAG4_10,"W19")|str_detect(DIAG4_11,"W19")|str_detect(DIAG4_12,"W19"),  1, NA),
-#      icd_S00 = if_else(str_detect(DIAG4_01,"S00")|str_detect(DIAG4_02,"S00")|str_detect(DIAG4_03,"S00")|str_detect(DIAG4_04,"S00")|str_de#tect(DIAG4_05,"S00")|str_detect(DIAG4_06,"S00")|str_detect(DIAG4_07,"S00")|str_detect(DIAG4_08,"S00")|str_detect(DIAG4_09,"S00")|str_detec#t(DIAG4_10,"S00")|str_detect(DIAG4_11,"S00")|str_detect(DIAG4_12,"S00"),  1, NA),
-#      icd_R31 = if_else(str_detect(DIAG4_01,"R31")|str_detect(DIAG4_02,"R31")|str_detect(DIAG4_03,"R31")|str_detect(DIAG4_04,"R31")|str_de#tect(DIAG4_05,"R31")|str_detect(DIAG4_06,"R31")|str_detect(DIAG4_07,"R31")|str_detect(DIAG4_08,"R31")|str_detect(DIAG4_09,"R31")|str_detec#t(DIAG4_10,"R31")|str_detect(DIAG4_11,"R31")|str_detect(DIAG4_12,"R31"),  1, NA),
-#      icd_B96 = if_else(str_detect(DIAG4_01,"B96")|str_detect(DIAG4_02,"B96")|str_detect(DIAG4_03,"B96")|str_detect(DIAG4_04,"B96")|str_de#tect(DIAG4_05,"B96")|str_detect(DIAG4_06,"B96")|str_detect(DIAG4_07,"B96")|str_detect(DIAG4_08,"B96")|str_detect(DIAG4_09,"B96")|str_detec#t(DIAG4_10,"B96")|str_detect(DIAG4_11,"B96")|str_detect(DIAG4_12,"B96"),  1, NA),
-#      icd_R41 = if_else(str_detect(DIAG4_01,"R41")|str_detect(DIAG4_02,"R41")|str_detect(DIAG4_03,"R41")|str_detect(DIAG4_04,"R41")|str_de#tect(DIAG4_05,"R41")|str_detect(DIAG4_06,"R41")|str_detect(DIAG4_07,"R41")|str_detect(DIAG4_08,"R41")|str_detect(DIAG4_09,"R41")|str_detec#t(DIAG4_10,"R41")|str_detect(DIAG4_11,"R41")|str_detect(DIAG4_12,"R41"),  1, NA),
-#      icd_R26 = if_else(str_detect(DIAG4_01,"R26")|str_detect(DIAG4_02,"R26")|str_detect(DIAG4_03,"R26")|str_detect(DIAG4_04,"R26")|str_de#tect(DIAG4_05,"R26")|str_detect(DIAG4_06,"R26")|str_detect(DIAG4_07,"R26")|str_detect(DIAG4_08,"R26")|str_detect(DIAG4_09,"R26")|str_detec#t(DIAG4_10,"R26")|str_detect(DIAG4_11,"R26")|str_detect(DIAG4_12,"R26"),  1, NA),
-#      icd_I67 = if_else(str_detect(DIAG4_01,"I67")|str_detect(DIAG4_02,"I67")|str_detect(DIAG4_03,"I67")|str_detect(DIAG4_04,"I67")|str_de#tect(DIAG4_05,"I67")|str_detect(DIAG4_06,"I67")|str_detect(DIAG4_07,"I67")|str_detect(DIAG4_08,"I67")|str_detect(DIAG4_09,"I67")|str_detec#t(DIAG4_10,"I67")|str_detect(DIAG4_11,"I67")|str_detect(DIAG4_12,"I67"),  1, NA),
-#      icd_R56 = if_else(str_detect(DIAG4_01,"R56")|str_detect(DIAG4_02,"R56")|str_detect(DIAG4_03,"R56")|str_detect(DIAG4_04,"R56")|str_de#tect(DIAG4_05,"R56")|str_detect(DIAG4_06,"R56")|str_detect(DIAG4_07,"R56")|str_detect(DIAG4_08,"R56")|str_detect(DIAG4_09,"R56")|str_detec#t(DIAG4_10,"R56")|str_detect(DIAG4_11,"R56")|str_detect(DIAG4_12,"R56"), 1, NA),
-#      icd_R40 = if_else(str_detect(DIAG4_01,"R40")|str_detect(DIAG4_02,"R40")|str_detect(DIAG4_03,"R40")|str_detect(DIAG4_04,"R40")|str_de#tect(DIAG4_05,"R40")|str_detect(DIAG4_06,"R40")|str_detect(DIAG4_07,"R40")|str_detect(DIAG4_08,"R40")|str_detect(DIAG4_09,"R40")|str_detec#t(DIAG4_10,"R40")|str_detect(DIAG4_11,"R40")|str_detect(DIAG4_12,"R40"),  1, NA),
-#      icd_T83 = if_else(str_detect(DIAG4_01,"T83")|str_detect(DIAG4_02,"T83")|str_detect(DIAG4_03,"T83")|str_detect(DIAG4_04,"T83")|str_de#tect(DIAG4_05,"T83")|str_detect(DIAG4_06,"T83")|str_detect(DIAG4_07,"T83")|str_detect(DIAG4_08,"T83")|str_detect(DIAG4_09,"T83")|str_detec#t(DIAG4_10,"T83")|str_detect(DIAG4_11,"T83")|str_detect(DIAG4_12,"T83"), 1, NA),
-#      icd_S06 = if_else(str_detect(DIAG4_01,"S06")|str_detect(DIAG4_02,"S06")|str_detect(DIAG4_03,"S06")|str_detect(DIAG4_04,"S06")|str_de#tect(DIAG4_05,"S06")|str_detect(DIAG4_06,"S06")|str_detect(DIAG4_07,"S06")|str_detect(DIAG4_08,"S06")|str_detect(DIAG4_09,"S06")|str_detec#t(DIAG4_10,"S06")|str_detect(DIAG4_11,"S06")|str_detect(DIAG4_12,"S06"),  1, NA),
-#      icd_S42 = if_else(str_detect(DIAG4_01,"S42")|str_detect(DIAG4_02,"S42")|str_detect(DIAG4_03,"S42")|str_detect(DIAG4_04,"S42")|str_de#tect(DIAG4_05,"S42")|str_detect(DIAG4_06,"S42")|str_detect(DIAG4_07,"S42")|str_detect(DIAG4_08,"S42")|str_detect(DIAG4_09,"S42")|str_detec#t(DIAG4_10,"S42")|str_detect(DIAG4_11,"S42")|str_detect(DIAG4_12,"S42"), 1, NA),
-#      icd_E87 = if_else(str_detect(DIAG4_01,"E87")|str_detect(DIAG4_02,"E87")|str_detect(DIAG4_03,"E87")|str_detect(DIAG4_04,"E87")|str_de#tect(DIAG4_05,"E87")|str_detect(DIAG4_06,"E87")|str_detect(DIAG4_07,"E87")|str_detect(DIAG4_08,"E87")|str_detect(DIAG4_09,"E87")|str_detec#t(DIAG4_10,"E87")|str_detect(DIAG4_11,"E87")|str_detect(DIAG4_12,"E87"),  1, NA),
-#      icd_M25 = if_else(str_detect(DIAG4_01,"M2")|str_detect(DIAG4_02,"M2")|str_detect(DIAG4_03,"M2")|str_detect(DIAG4_04,"M2")|str_detect#(DIAG4_05,"M2")|str_detect(DIAG4_06,"M2")|str_detect(DIAG4_07,"M2")|str_detect(DIAG4_08,"M2")|str_detect(DIAG4_09,"M2")|str_detect(DIAG4_1#0,"M2")|str_detect(DIAG4_11,"M2")|str_detect(DIAG4_12,"M2"),  1, NA),
-#      icd_E86 = if_else(str_detect(DIAG4_01,"E86")|str_detect(DIAG4_02,"E86")|str_detect(DIAG4_03,"E86")|str_detect(DIAG4_04,"E86")|str_de#tect(DIAG4_05,"E86")|str_detect(DIAG4_06,"E86")|str_detect(DIAG4_07,"E86")|str_detect(DIAG4_08,"E86")|str_detect(DIAG4_09,"E86")|str_detec#t(DIAG4_10,"E86")|str_detect(DIAG4_11,"E86")|str_detect(DIAG4_12,"E86"), 1, NA),
-#      icd_R54 = if_else(str_detect(DIAG4_01,"R54")|str_detect(DIAG4_02,"R54")|str_detect(DIAG4_03,"R54")|str_detect(DIAG4_04,"R54")|str_de#tect(DIAG4_05,"R54")|str_detect(DIAG4_06,"R54")|str_detect(DIAG4_07,"R54")|str_detect(DIAG4_08,"R54")|str_detect(DIAG4_09,"R54")|str_detec#t(DIAG4_10,"R54")|str_detect(DIAG4_11,"R54")|str_detect(DIAG4_12,"R54"), 1, NA),
-#      icd_Z50 = if_else(str_detect(DIAG4_01,"Z50")|str_detect(DIAG4_02,"Z50")|str_detect(DIAG4_03,"Z50")|str_detect(DIAG4_04,"Z50")|str_de#tect(DIAG4_05,"Z50")|str_detect(DIAG4_06,"Z50")|str_detect(DIAG4_07,"Z50")|str_detect(DIAG4_08,"Z50")|str_detect(DIAG4_09,"Z50")|str_detec#t(DIAG4_10,"Z50")|str_detect(DIAG4_11,"Z50")|str_detect(DIAG4_12,"Z50"), 1, NA),
-#      icd_F03 = if_else(str_detect(DIAG4_01,"F03")|str_detect(DIAG4_02,"F03")|str_detect(DIAG4_03,"F03")|str_detect(DIAG4_04,"F03")|str_de#tect(DIAG4_05,"F03")|str_detect(DIAG4_06,"F03")|str_detect(DIAG4_07,"F03")|str_detect(DIAG4_08,"F03")|str_detect(DIAG4_09,"F03")|str_detec#t(DIAG4_10,"F03")|str_detect(DIAG4_11,"F03")|str_detect(DIAG4_12,"F03"),  1, NA),
-#      icd_W18 = if_else(str_detect(DIAG4_01,"W18")|str_detect(DIAG4_02,"W18")|str_detect(DIAG4_03,"W18")|str_detect(DIAG4_04,"W18")|str_de#tect(DIAG4_05,"W18")|str_detect(DIAG4_06,"W18")|str_detect(DIAG4_07,"W18")|str_detect(DIAG4_08,"W18")|str_detect(DIAG4_09,"W18")|str_detec#t(DIAG4_10,"W18")|str_detect(DIAG4_11,"W18")|str_detect(DIAG4_12,"W18"), 1, NA),
-#      icd_Z75 = if_else(str_detect(DIAG4_01,"Z75")|str_detect(DIAG4_02,"Z75")|str_detect(DIAG4_03,"Z75")|str_detect(DIAG4_04,"Z75")|str_de#tect(DIAG4_05,"Z75")|str_detect(DIAG4_06,"Z75")|str_detect(DIAG4_07,"Z75")|str_detect(DIAG4_08,"Z75")|str_detect(DIAG4_09,"Z75")|str_detec#t(DIAG4_10,"Z75")|str_detect(DIAG4_11,"Z75")|str_detect(DIAG4_12,"Z75"),  1, NA),
-#      icd_F01 = if_else(str_detect(DIAG4_01,"F01")|str_detect(DIAG4_02,"F01")|str_detect(DIAG4_03,"F01")|str_detect(DIAG4_04,"F01")|str_de#tect(DIAG4_05,"F01")|str_detect(DIAG4_06,"F01")|str_detect(DIAG4_07,"F01")|str_detect(DIAG4_08,"F01")|str_detect(DIAG4_09,"F01")|str_detec#t(DIAG4_10,"F01")|str_detect(DIAG4_11,"F01")|str_detect(DIAG4_12,"F01"),  1, NA),
-#      icd_S80 = if_else(str_detect(DIAG4_01,"S80")|str_detect(DIAG4_02,"S80")|str_detect(DIAG4_03,"S80")|str_detect(DIAG4_04,"S80")|str_de#tect(DIAG4_05,"S80")|str_detect(DIAG4_06,"S80")|str_detect(DIAG4_07,"S80")|str_detect(DIAG4_08,"S80")|str_detect(DIAG4_09,"S80")|str_detec#t(DIAG4_10,"S80")|str_detect(DIAG4_11,"S80")|str_detect(DIAG4_12,"S80"),  1, NA),
-#      icd_L03 = if_else(str_detect(DIAG4_01,"L03")|str_detect(DIAG4_02,"L03")|str_detect(DIAG4_03,"L03")|str_detect(DIAG4_04,"L03")|str_de#tect(DIAG4_05,"L03")|str_detect(DIAG4_06,"L03")|str_detect(DIAG4_07,"L03")|str_detect(DIAG4_08,"L03")|str_detect(DIAG4_09,"L03")|str_detec#t(DIAG4_10,"L03")|str_detect(DIAG4_11,"L03")|str_detect(DIAG4_12,"L03"),  1, NA),
-#      icd_H54 = if_else(str_detect(DIAG4_01,"H54")|str_detect(DIAG4_02,"H54")|str_detect(DIAG4_03,"H54")|str_detect(DIAG4_04,"H54")|str_de#tect(DIAG4_05,"H54")|str_detect(DIAG4_06,"H54")|str_detect(DIAG4_07,"H54")|str_detect(DIAG4_08,"H54")|str_detect(DIAG4_09,"H54")|str_detec#t(DIAG4_10,"H54")|str_detect(DIAG4_11,"H54")|str_detect(DIAG4_12,"H54"),  1, NA),
-#      icd_E53 = if_else(str_detect(DIAG4_01,"E53")|str_detect(DIAG4_02,"E53")|str_detect(DIAG4_03,"E53")|str_detect(DIAG4_04,"E53")|str_de#tect(DIAG4_05,"E53")|str_detect(DIAG4_06,"E53")|str_detect(DIAG4_07,"E53")|str_detect(DIAG4_08,"E53")|str_detect(DIAG4_09,"E53")|str_detec#t(DIAG4_10,"E53")|str_detect(DIAG4_11,"E53")|str_detect(DIAG4_12,"E53"),  1, NA),
-#      icd_Z60 = if_else(str_detect(DIAG4_01,"Z60")|str_detect(DIAG4_02,"Z60")|str_detect(DIAG4_03,"Z60")|str_detect(DIAG4_04,"Z60")|str_de#tect(DIAG4_05,"Z60")|str_detect(DIAG4_06,"Z60")|str_detect(DIAG4_07,"Z60")|str_detect(DIAG4_08,"Z60")|str_detect(DIAG4_09,"Z60")|str_detec#t(DIAG4_10,"Z60")|str_detect(DIAG4_11,"Z60")|str_detect(DIAG4_12,"Z60"), 1, NA),
-#      icd_G20 = if_else(str_detect(DIAG4_01,"G20")|str_detect(DIAG4_02,"G20")|str_detect(DIAG4_03,"G20")|str_detect(DIAG4_04,"G20")|str_de#tect(DIAG4_05,"G20")|str_detect(DIAG4_06,"G20")|str_detect(DIAG4_07,"G20")|str_detect(DIAG4_08,"G20")|str_detect(DIAG4_09,"G20")|str_detec#t(DIAG4_10,"G20")|str_detect(DIAG4_11,"G20")|str_detect(DIAG4_12,"G20"), 1, NA),
-#      icd_R55 = if_else(str_detect(DIAG4_01,"R55")|str_detect(DIAG4_02,"R55")|str_detect(DIAG4_03,"R55")|str_detect(DIAG4_04,"R55")|str_de#tect(DIAG4_05,"R55")|str_detect(DIAG4_06,"R55")|str_detect(DIAG4_07,"R55")|str_detect(DIAG4_08,"R55")|str_detect(DIAG4_09,"R55")|str_detec#t(DIAG4_10,"R55")|str_detect(DIAG4_11,"R55")|str_detect(DIAG4_12,"R55"),  1, NA),
-#      icd_S22 = if_else(str_detect(DIAG4_01,"S22")|str_detect(DIAG4_02,"S22")|str_detect(DIAG4_03,"S22")|str_detect(DIAG4_04,"S22")|str_de#tect(DIAG4_05,"S22")|str_detect(DIAG4_06,"S22")|str_detect(DIAG4_07,"S22")|str_detect(DIAG4_08,"S22")|str_detect(DIAG4_09,"S22")|str_detec#t(DIAG4_10,"S22")|str_detect(DIAG4_11,"S22")|str_detect(DIAG4_12,"S22"),  1, NA),
-#      icd_K59 = if_else(str_detect(DIAG4_01,"K59")|str_detect(DIAG4_02,"K59")|str_detect(DIAG4_03,"K59")|str_detect(DIAG4_04,"K59")|str_de#tect(DIAG4_05,"K59")|str_detect(DIAG4_06,"K59")|str_detect(DIAG4_07,"K59")|str_detect(DIAG4_08,"K59")|str_detect(DIAG4_09,"K59")|str_detec#t(DIAG4_10,"K59")|str_detect(DIAG4_11,"K59")|str_detect(DIAG4_12,"K59"),  1, NA),
-#      icd_N17 = if_else(str_detect(DIAG4_01,"N17")|str_detect(DIAG4_02,"N17")|str_detect(DIAG4_03,"N17")|str_detect(DIAG4_04,"N17")|str_de#tect(DIAG4_05,"N17")|str_detect(DIAG4_06,"N17")|str_detect(DIAG4_07,"N17")|str_detect(DIAG4_08,"N17")|str_detect(DIAG4_09,"N17")|str_detec#t(DIAG4_10,"N17")|str_detect(DIAG4_11,"N17")|str_detect(DIAG4_12,"N17"), 1, NA),
-#      icd_L89 = if_else(str_detect(DIAG4_01,"L89")|str_detect(DIAG4_02,"L89")|str_detect(DIAG4_03,"L89")|str_detect(DIAG4_04,"L89")|str_de#tect(DIAG4_05,"L89")|str_detect(DIAG4_06,"L89")|str_detect(DIAG4_07,"L89")|str_detect(DIAG4_08,"L89")|str_detect(DIAG4_09,"L89")|str_detec#t(DIAG4_10,"L89")|str_detect(DIAG4_11,"L89")|str_detect(DIAG4_12,"L89"),  1, NA),
-#      icd_Z22 = if_else(str_detect(DIAG4_01,"Z22")|str_detect(DIAG4_02,"Z22")|str_detect(DIAG4_03,"Z22")|str_detect(DIAG4_04,"Z22")|str_de#tect(DIAG4_05,"Z22")|str_detect(DIAG4_06,"Z22")|str_detect(DIAG4_07,"Z22")|str_detect(DIAG4_08,"Z22")|str_detect(DIAG4_09,"Z22")|str_detec#t(DIAG4_10,"Z22")|str_detect(DIAG4_11,"Z22")|str_detect(DIAG4_12,"Z22"), 1, NA),
-#      icd_B95 = if_else(str_detect(DIAG4_01,"B95")|str_detect(DIAG4_02,"B95")|str_detect(DIAG4_03,"B95")|str_detect(DIAG4_04,"B95")|str_de#tect(DIAG4_05,"B95")|str_detect(DIAG4_06,"B95")|str_detect(DIAG4_07,"B95")|str_detect(DIAG4_08,"B95")|str_detect(DIAG4_09,"B95")|str_detec#t(DIAG4_10,"B95")|str_detect(DIAG4_11,"B95")|str_detect(DIAG4_12,"B95"),  1, NA),
-#      icd_N19 = if_else(str_detect(DIAG4_01,"N19")|str_detect(DIAG4_02,"N19")|str_detect(DIAG4_03,"N19")|str_detect(DIAG4_04,"N19")|str_de#tect(DIAG4_05,"N19")|str_detect(DIAG4_06,"N19")|str_detect(DIAG4_07,"N19")|str_detect(DIAG4_08,"N19")|str_detect(DIAG4_09,"N19")|str_detec#t(DIAG4_10,"N19")|str_detect(DIAG4_11,"N19")|str_detect(DIAG4_12,"N19"),  1, NA),
-#      icd_A41 = if_else(str_detect(DIAG4_01,"A41")|str_detect(DIAG4_02,"A41")|str_detect(DIAG4_03,"A41")|str_detect(DIAG4_04,"A41")|str_de#tect(DIAG4_05,"A41")|str_detect(DIAG4_06,"A41")|str_detect(DIAG4_07,"A41")|str_detect(DIAG4_08,"A41")|str_detect(DIAG4_09,"A41")|str_detec#t(DIAG4_10,"A41")|str_detect(DIAG4_11,"A41")|str_detect(DIAG4_12,"A41"), 1, NA),
-#      icd_L97 = if_else(str_detect(DIAG4_01,"L97")|str_detect(DIAG4_02,"L97")|str_detect(DIAG4_03,"L97")|str_detect(DIAG4_04,"L97")|str_de#tect(DIAG4_05,"L97")|str_detect(DIAG4_06,"L97")|str_detect(DIAG4_07,"L97")|str_detect(DIAG4_08,"L97")|str_detect(DIAG4_09,"L97")|str_detec#t(DIAG4_10,"L97")|str_detect(DIAG4_11,"L97")|str_detect(DIAG4_12,"L97"),  1, NA),
-#      icd_R44 = if_else(str_detect(DIAG4_01,"R44")|str_detect(DIAG4_02,"R44")|str_detect(DIAG4_03,"R44")|str_detect(DIAG4_04,"R44")|str_de#tect(DIAG4_05,"R44")|str_detect(DIAG4_06,"R44")|str_detect(DIAG4_07,"R44")|str_detect(DIAG4_08,"R44")|str_detect(DIAG4_09,"R44")|str_detec#t(DIAG4_10,"R44")|str_detect(DIAG4_11,"R44")|str_detect(DIAG4_12,"R44"),  1, NA),
-#      icd_K26 = if_else(str_detect(DIAG4_01,"K26")|str_detect(DIAG4_02,"K26")|str_detect(DIAG4_03,"K26")|str_detect(DIAG4_04,"K26")|str_de#tect(DIAG4_05,"K26")|str_detect(DIAG4_06,"K26")|str_detect(DIAG4_07,"K26")|str_detect(DIAG4_08,"K26")|str_detect(DIAG4_09,"K26")|str_detec#t(DIAG4_10,"K26")|str_detect(DIAG4_11,"K26")|str_detect(DIAG4_12,"K26"),  1, NA),
-#      icd_I95 = if_else(str_detect(DIAG4_01,"I95")|str_detect(DIAG4_02,"I95")|str_detect(DIAG4_03,"I95")|str_detect(DIAG4_04,"I95")|str_de#tect(DIAG4_05,"I95")|str_detect(DIAG4_06,"I95")|str_detect(DIAG4_07,"I95")|str_detect(DIAG4_08,"I95")|str_detect(DIAG4_09,"I95")|str_detec#t(DIAG4_10,"I95")|str_detect(DIAG4_11,"I95")|str_detect(DIAG4_12,"I95"), 1, NA),
-#      icd_Z87 = if_else(str_detect(DIAG4_01,"Z87")|str_detect(DIAG4_02,"Z87")|str_detect(DIAG4_03,"Z87")|str_detect(DIAG4_04,"Z87")|str_de#tect(DIAG4_05,"Z87")|str_detect(DIAG4_06,"Z87")|str_detect(DIAG4_07,"Z87")|str_detect(DIAG4_08,"Z87")|str_detect(DIAG4_09,"Z87")|str_detec#t(DIAG4_10,"Z87")|str_detect(DIAG4_11,"Z87")|str_detect(DIAG4_12,"Z87"),  1, NA),
-#      icd_J96 = if_else(str_detect(DIAG4_01,"J96")|str_detect(DIAG4_02,"J96")|str_detect(DIAG4_03,"J96")|str_detect(DIAG4_04,"J96")|str_de#tect(DIAG4_05,"J96")|str_detect(DIAG4_06,"J96")|str_detect(DIAG4_07,"J96")|str_detect(DIAG4_08,"J96")|str_detect(DIAG4_09,"J96")|str_detec#t(DIAG4_10,"J96")|str_detect(DIAG4_11,"J96")|str_detect(DIAG4_12,"J96"), 1, NA),
-#      icd_X59 = if_else(str_detect(DIAG4_01,"X59")|str_detect(DIAG4_02,"X59")|str_detect(DIAG4_03,"X59")|str_detect(DIAG4_04,"X59")|str_de#tect(DIAG4_05,"X59")|str_detect(DIAG4_06,"X59")|str_detect(DIAG4_07,"X59")|str_detect(DIAG4_08,"X59")|str_detect(DIAG4_09,"X59")|str_detec#t(DIAG4_10,"X59")|str_detect(DIAG4_11,"X59")|str_detect(DIAG4_12,"X59"),  1, NA),
-#      icd_M19 = if_else(str_detect(DIAG4_01,"M19")|str_detect(DIAG4_02,"M19")|str_detect(DIAG4_03,"M19")|str_detect(DIAG4_04,"M19")|str_de#tect(DIAG4_05,"M19")|str_detect(DIAG4_06,"M19")|str_detect(DIAG4_07,"M19")|str_detect(DIAG4_08,"M19")|str_detect(DIAG4_09,"M19")|str_detec#t(DIAG4_10,"M19")|str_detect(DIAG4_11,"M19")|str_detect(DIAG4_12,"M19"), 1, NA),
-#      icd_G40 = if_else(str_detect(DIAG4_01,"G40")|str_detect(DIAG4_02,"G40")|str_detect(DIAG4_03,"G40")|str_detect(DIAG4_04,"G40")|str_de#tect(DIAG4_05,"G40")|str_detect(DIAG4_06,"G40")|str_detect(DIAG4_07,"G40")|str_detect(DIAG4_08,"G40")|str_detect(DIAG4_09,"G40")|str_detec#t(DIAG4_10,"G40")|str_detect(DIAG4_11,"G40")|str_detect(DIAG4_12,"G40"),  1, NA),
-#      icd_M81 = if_else(str_detect(DIAG4_01,"M81")|str_detect(DIAG4_02,"M81")|str_detect(DIAG4_03,"M81")|str_detect(DIAG4_04,"M81")|str_de#tect(DIAG4_05,"M81")|str_detect(DIAG4_06,"M81")|str_detect(DIAG4_07,"M81")|str_detect(DIAG4_08,"M81")|str_detect(DIAG4_09,"M81")|str_detec#t(DIAG4_10,"M81")|str_detect(DIAG4_11,"M81")|str_detect(DIAG4_12,"M81"),  1, NA),
-#      icd_S72 = if_else(str_detect(DIAG4_01,"S72")|str_detect(DIAG4_02,"S72")|str_detect(DIAG4_03,"S72")|str_detect(DIAG4_04,"S72")|str_de#tect(DIAG4_05,"S72")|str_detect(DIAG4_06,"S72")|str_detect(DIAG4_07,"S72")|str_detect(DIAG4_08,"S72")|str_detect(DIAG4_09,"S72")|str_detec#t(DIAG4_10,"S72")|str_detect(DIAG4_11,"S72")|str_detect(DIAG4_12,"S72"),  1, NA),
-#      icd_S32 = if_else(str_detect(DIAG4_01,"S32")|str_detect(DIAG4_02,"S32")|str_detect(DIAG4_03,"S32")|str_detect(DIAG4_04,"S32")|str_de#tect(DIAG4_05,"S32")|str_detect(DIAG4_06,"S32")|str_detect(DIAG4_07,"S32")|str_detect(DIAG4_08,"S32")|str_detect(DIAG4_09,"S32")|str_detec#t(DIAG4_10,"S32")|str_detect(DIAG4_11,"S32")|str_detect(DIAG4_12,"S32"),  1, NA),
-#      icd_E16 = if_else(str_detect(DIAG4_01,"E16")|str_detect(DIAG4_02,"E16")|str_detect(DIAG4_03,"E16")|str_detect(DIAG4_04,"E16")|str_de#tect(DIAG4_05,"E16")|str_detect(DIAG4_06,"E16")|str_detect(DIAG4_07,"E16")|str_detect(DIAG4_08,"E16")|str_detect(DIAG4_09,"E16")|str_detec#t(DIAG4_10,"E16")|str_detect(DIAG4_11,"E16")|str_detect(DIAG4_12,"E16"),  1, NA),
-#      icd_R94 = if_else(str_detect(DIAG4_01,"R94")|str_detect(DIAG4_02,"R94")|str_detect(DIAG4_03,"R94")|str_detect(DIAG4_04,"R94")|str_de#tect(DIAG4_05,"R94")|str_detect(DIAG4_06,"R94")|str_detect(DIAG4_07,"R94")|str_detect(DIAG4_08,"R94")|str_detect(DIAG4_09,"R94")|str_detec#t(DIAG4_10,"R94")|str_detect(DIAG4_11,"R94")|str_detect(DIAG4_12,"R94"),  1, NA),
-#      icd_N18 = if_else(str_detect(DIAG4_01,"N18")|str_detect(DIAG4_02,"N18")|str_detect(DIAG4_03,"N18")|str_detect(DIAG4_04,"N18")|str_de#tect(DIAG4_05,"N18")|str_detect(DIAG4_06,"N18")|str_detect(DIAG4_07,"N18")|str_detect(DIAG4_08,"N18")|str_detect(DIAG4_09,"N18")|str_detec#t(DIAG4_10,"N18")|str_detect(DIAG4_11,"N18")|str_detect(DIAG4_12,"N18"),  1, NA),
-#      icd_R33 = if_else(str_detect(DIAG4_01,"R33")|str_detect(DIAG4_02,"R33")|str_detect(DIAG4_03,"R33")|str_detect(DIAG4_04,"R33")|str_de#tect(DIAG4_05,"R33")|str_detect(DIAG4_06,"R33")|str_detect(DIAG4_07,"R33")|str_detect(DIAG4_08,"R33")|str_detect(DIAG4_09,"R33")|str_detec#t(DIAG4_10,"R33")|str_detect(DIAG4_11,"R33")|str_detect(DIAG4_12,"R33"),  1, NA),
-#      icd_R69 = if_else(str_detect(DIAG4_01,"R69")|str_detect(DIAG4_02,"R69")|str_detect(DIAG4_03,"R69")|str_detect(DIAG4_04,"R69")|str_de#tect(DIAG4_05,"R69")|str_detect(DIAG4_06,"R69")|str_detect(DIAG4_07,"R69")|str_detect(DIAG4_08,"R69")|str_detect(DIAG4_09,"R69")|str_detec#t(DIAG4_10,"R69")|str_detect(DIAG4_11,"R69")|str_detect(DIAG4_12,"R69"),  1, NA),
-#      icd_N28 = if_else(str_detect(DIAG4_01,"N28")|str_detect(DIAG4_02,"N28")|str_detect(DIAG4_03,"N28")|str_detect(DIAG4_04,"N28")|str_de#tect(DIAG4_05,"N28")|str_detect(DIAG4_06,"N28")|str_detect(DIAG4_07,"N28")|str_detect(DIAG4_08,"N28")|str_detect(DIAG4_09,"N28")|str_detec#t(DIAG4_10,"N28")|str_detect(DIAG4_11,"N28")|str_detect(DIAG4_12,"N28"), 1, NA),
-#      icd_R32 = if_else(str_detect(DIAG4_01,"R32")|str_detect(DIAG4_02,"R32")|str_detect(DIAG4_03,"R32")|str_detect(DIAG4_04,"R32")|str_de#tect(DIAG4_05,"R32")|str_detect(DIAG4_06,"R32")|str_detect(DIAG4_07,"R32")|str_detect(DIAG4_08,"R32")|str_detect(DIAG4_09,"R32")|str_detec#t(DIAG4_10,"R32")|str_detect(DIAG4_11,"R32")|str_detect(DIAG4_12,"R32"), 1, NA),
-#      icd_G31 = if_else(str_detect(DIAG4_01,"G31")|str_detect(DIAG4_02,"G31")|str_detect(DIAG4_03,"G31")|str_detect(DIAG4_04,"G31")|str_de#tect(DIAG4_05,"G31")|str_detect(DIAG4_06,"G31")|str_detect(DIAG4_07,"G31")|str_detect(DIAG4_08,"G31")|str_detect(DIAG4_09,"G31")|str_detec#t(DIAG4_10,"G31")|str_detect(DIAG4_11,"G31")|str_detect(DIAG4_12,"G31"),  1, NA),
-#      icd_Y95 = if_else(str_detect(DIAG4_01,"Y95")|str_detect(DIAG4_02,"Y95")|str_detect(DIAG4_03,"Y95")|str_detect(DIAG4_04,"Y95")|str_de#tect(DIAG4_05,"Y95")|str_detect(DIAG4_06,"Y95")|str_detect(DIAG4_07,"Y95")|str_detect(DIAG4_08,"Y95")|str_detect(DIAG4_09,"Y95")|str_detec#t(DIAG4_10,"Y95")|str_detect(DIAG4_11,"Y95")|str_detect(DIAG4_12,"Y95"),  1, NA),
-#      icd_S09 = if_else(str_detect(DIAG4_01,"S09")|str_detect(DIAG4_02,"S09")|str_detect(DIAG4_03,"S09")|str_detect(DIAG4_04,"S09")|str_de#tect(DIAG4_05,"S09")|str_detect(DIAG4_06,"S09")|str_detect(DIAG4_07,"S09")|str_detect(DIAG4_08,"S09")|str_detect(DIAG4_09,"S09")|str_detec#t(DIAG4_10,"S09")|str_detect(DIAG4_11,"S09")|str_detect(DIAG4_12,"S09"),  1, NA),
-#      icd_R45 = if_else(str_detect(DIAG4_01,"R45")|str_detect(DIAG4_02,"R45")|str_detect(DIAG4_03,"R45")|str_detect(DIAG4_04,"R45")|str_de#tect(DIAG4_05,"R45")|str_detect(DIAG4_06,"R45")|str_detect(DIAG4_07,"R45")|str_detect(DIAG4_08,"R45")|str_detect(DIAG4_09,"R45")|str_detec#t(DIAG4_10,"R45")|str_detect(DIAG4_11,"R45")|str_detect(DIAG4_12,"R45"),  1, NA),
-#      icd_G45 = if_else(str_detect(DIAG4_01,"G45")|str_detect(DIAG4_02,"G45")|str_detect(DIAG4_03,"G45")|str_detect(DIAG4_04,"G45")|str_de#tect(DIAG4_05,"G45")|str_detect(DIAG4_06,"G45")|str_detect(DIAG4_07,"G45")|str_detect(DIAG4_08,"G45")|str_detect(DIAG4_09,"G45")|str_detec#t(DIAG4_10,"G45")|str_detect(DIAG4_11,"G45")|str_detect(DIAG4_12,"G45"),  1, NA),
-#      icd_S01 = if_else(str_detect(DIAG4_01,"S01")|str_detect(DIAG4_02,"S01")|str_detect(DIAG4_03,"S01")|str_detect(DIAG4_04,"S01")|str_de#tect(DIAG4_05,"S01")|str_detect(DIAG4_06,"S01")|str_detect(DIAG4_07,"S01")|str_detect(DIAG4_08,"S01")|str_detect(DIAG4_09,"S01")|str_detec#t(DIAG4_10,"S01")|str_detect(DIAG4_11,"S01")|str_detect(DIAG4_12,"S01"),  1, NA),
-#      icd_A04 = if_else(str_detect(DIAG4_01,"A04")|str_detect(DIAG4_02,"A04")|str_detect(DIAG4_03,"A04")|str_detect(DIAG4_04,"A04")|str_de#tect(DIAG4_05,"A04")|str_detect(DIAG4_06,"A04")|str_detect(DIAG4_07,"A04")|str_detect(DIAG4_08,"A04")|str_detect(DIAG4_09,"A04")|str_detec#t(DIAG4_10,"A04")|str_detect(DIAG4_11,"A04")|str_detect(DIAG4_12,"A04"),  1, NA),
-#      icd_A09 = if_else(str_detect(DIAG4_01,"A09")|str_detect(DIAG4_02,"A09")|str_detect(DIAG4_03,"A09")|str_detect(DIAG4_04,"A09")|str_de#tect(DIAG4_05,"A09")|str_detect(DIAG4_06,"A09")|str_detect(DIAG4_07,"A09")|str_detect(DIAG4_08,"A09")|str_detect(DIAG4_09,"A09")|str_detec#t(DIAG4_10,"A09")|str_detect(DIAG4_11,"A09")|str_detect(DIAG4_12,"A09"),  1, NA),
-#      icd_J18 = if_else(str_detect(DIAG4_01,"J18")|str_detect(DIAG4_02,"J18")|str_detect(DIAG4_03,"J18")|str_detect(DIAG4_04,"J18")|str_de#tect(DIAG4_05,"J18")|str_detect(DIAG4_06,"J18")|str_detect(DIAG4_07,"J18")|str_detect(DIAG4_08,"J18")|str_detect(DIAG4_09,"J18")|str_detec#t(DIAG4_10,"J18")|str_detect(DIAG4_11,"J18")|str_detect(DIAG4_12,"J18"), 1, NA),
-#      icd_Z74 = if_else(str_detect(DIAG4_01,"Z74")|str_detect(DIAG4_02,"Z74")|str_detect(DIAG4_03,"Z74")|str_detect(DIAG4_04,"Z74")|str_de#tect(DIAG4_05,"Z74")|str_detect(DIAG4_06,"Z74")|str_detect(DIAG4_07,"Z74")|str_detect(DIAG4_08,"Z74")|str_detect(DIAG4_09,"Z74")|str_detec#t(DIAG4_10,"Z74")|str_detect(DIAG4_11,"Z74")|str_detect(DIAG4_12,"Z74"),  1, NA),
-#      icd_M79 = if_else(str_detect(DIAG4_01,"M79")|str_detect(DIAG4_02,"M79")|str_detect(DIAG4_03,"M79")|str_detect(DIAG4_04,"M79")|str_de#tect(DIAG4_05,"M79")|str_detect(DIAG4_06,"M79")|str_detect(DIAG4_07,"M79")|str_detect(DIAG4_08,"M79")|str_detect(DIAG4_09,"M79")|str_detec#t(DIAG4_10,"M79")|str_detect(DIAG4_11,"M79")|str_detect(DIAG4_12,"M79"),  1, NA),
-#      icd_W06 = if_else(str_detect(DIAG4_01,"W06")|str_detect(DIAG4_02,"W06")|str_detect(DIAG4_03,"W06")|str_detect(DIAG4_04,"W06")|str_de#tect(DIAG4_05,"W06")|str_detect(DIAG4_06,"W06")|str_detect(DIAG4_07,"W06")|str_detect(DIAG4_08,"W06")|str_detect(DIAG4_09,"W06")|str_detec#t(DIAG4_10,"W06")|str_detect(DIAG4_11,"W06")|str_detect(DIAG4_12,"W06"), 1, NA),
-#      icd_J69 = if_else(str_detect(DIAG4_01,"J69")|str_detect(DIAG4_02,"J69")|str_detect(DIAG4_03,"J69")|str_detect(DIAG4_04,"J69")|str_de#tect(DIAG4_05,"J69")|str_detect(DIAG4_06,"J69")|str_detect(DIAG4_07,"J69")|str_detect(DIAG4_08,"J69")|str_detect(DIAG4_09,"J69")|str_detec#t(DIAG4_10,"J69")|str_detect(DIAG4_11,"J69")|str_detect(DIAG4_12,"J69"),  1, NA),
-#      icd_R47 = if_else(str_detect(DIAG4_01,"R47")|str_detect(DIAG4_02,"R47")|str_detect(DIAG4_03,"R47")|str_detect(DIAG4_04,"R47")|str_de#tect(DIAG4_05,"R47")|str_detect(DIAG4_06,"R47")|str_detect(DIAG4_07,"R47")|str_detect(DIAG4_08,"R47")|str_detect(DIAG4_09,"R47")|str_detec#t(DIAG4_10,"R47")|str_detect(DIAG4_11,"R47")|str_detect(DIAG4_12,"R47"),  1, NA),
-#      icd_E55 = if_else(str_detect(DIAG4_01,"E55")|str_detect(DIAG4_02,"E55")|str_detect(DIAG4_03,"E55")|str_detect(DIAG4_04,"E55")|str_de#tect(DIAG4_05,"E55")|str_detect(DIAG4_06,"E55")|str_detect(DIAG4_07,"E55")|str_detect(DIAG4_08,"E55")|str_detect(DIAG4_09,"E55")|str_detec#t(DIAG4_10,"E55")|str_detect(DIAG4_11,"E55")|str_detect(DIAG4_12,"E55"), 1, NA),
-#      icd_Z93 = if_else(str_detect(DIAG4_01,"Z93")|str_detect(DIAG4_02,"Z93")|str_detect(DIAG4_03,"Z93")|str_detect(DIAG4_04,"Z93")|str_de#tect(DIAG4_05,"Z93")|str_detect(DIAG4_06,"Z93")|str_detect(DIAG4_07,"Z93")|str_detect(DIAG4_08,"Z93")|str_detect(DIAG4_09,"Z93")|str_detec#t(DIAG4_10,"Z93")|str_detect(DIAG4_11,"Z93")|str_detect(DIAG4_12,"Z93"),  1, NA),
-#      icd_R02 = if_else(str_detect(DIAG4_01,"R02")|str_detect(DIAG4_02,"R02")|str_detect(DIAG4_03,"R02")|str_detect(DIAG4_04,"R02")|str_de#tect(DIAG4_05,"R02")|str_detect(DIAG4_06,"R02")|str_detect(DIAG4_07,"R02")|str_detect(DIAG4_08,"R02")|str_detect(DIAG4_09,"R02")|str_detec#t(DIAG4_10,"R02")|str_detect(DIAG4_11,"R02")|str_detect(DIAG4_12,"R02"), 1, NA),
-#      icd_R63 = if_else(str_detect(DIAG4_01,"R63")|str_detect(DIAG4_02,"R63")|str_detect(DIAG4_03,"R63")|str_detect(DIAG4_04,"R63")|str_de#tect(DIAG4_05,"R63")|str_detect(DIAG4_06,"R63")|str_detect(DIAG4_07,"R63")|str_detect(DIAG4_08,"R63")|str_detect(DIAG4_09,"R63")|str_detec#t(DIAG4_10,"R63")|str_detect(DIAG4_11,"R63")|str_detect(DIAG4_12,"R63"), 1, NA),
-#      icd_H91 = if_else(str_detect(DIAG4_01,"H91")|str_detect(DIAG4_02,"H91")|str_detect(DIAG4_03,"H91")|str_detect(DIAG4_04,"H91")|str_de#tect(DIAG4_05,"H91")|str_detect(DIAG4_06,"H91")|str_detect(DIAG4_07,"H91")|str_detect(DIAG4_08,"H91")|str_detect(DIAG4_09,"H91")|str_detec#t(DIAG4_10,"H91")|str_detect(DIAG4_11,"H91")|str_detect(DIAG4_12,"H91"),  1, NA),
-#      icd_W10 = if_else(str_detect(DIAG4_01,"W10")|str_detect(DIAG4_02,"W10")|str_detect(DIAG4_03,"W10")|str_detect(DIAG4_04,"W10")|str_de#tect(DIAG4_05,"W10")|str_detect(DIAG4_06,"W10")|str_detect(DIAG4_07,"W10")|str_detect(DIAG4_08,"W10")|str_detect(DIAG4_09,"W10")|str_detec#t(DIAG4_10,"W10")|str_detect(DIAG4_11,"W10")|str_detect(DIAG4_12,"W10"), 1, NA),
-#      icd_W01 = if_else(str_detect(DIAG4_01,"W01")|str_detect(DIAG4_02,"W01")|str_detect(DIAG4_03,"W01")|str_detect(DIAG4_04,"W01")|str_de#tect(DIAG4_05,"W01")|str_detect(DIAG4_06,"W01")|str_detect(DIAG4_07,"W01")|str_detect(DIAG4_08,"W01")|str_detect(DIAG4_09,"W01")|str_detec#t(DIAG4_10,"W01")|str_detect(DIAG4_11,"W01")|str_detect(DIAG4_12,"W01"), 1, NA),
-#      icd_E05 = if_else(str_detect(DIAG4_01,"E05")|str_detect(DIAG4_02,"E05")|str_detect(DIAG4_03,"E05")|str_detect(DIAG4_04,"E05")|str_de#tect(DIAG4_05,"E05")|str_detect(DIAG4_06,"E05")|str_detect(DIAG4_07,"E05")|str_detect(DIAG4_08,"E05")|str_detect(DIAG4_09,"E05")|str_detec#t(DIAG4_10,"E05")|str_detect(DIAG4_11,"E05")|str_detect(DIAG4_12,"E05"), 1, NA),
-#      icd_M41 = if_else(str_detect(DIAG4_01,"M41")|str_detect(DIAG4_02,"M41")|str_detect(DIAG4_03,"M41")|str_detect(DIAG4_04,"M41")|str_de#tect(DIAG4_05,"M41")|str_detect(DIAG4_06,"M41")|str_detect(DIAG4_07,"M41")|str_detect(DIAG4_08,"M41")|str_detect(DIAG4_09,"M41")|str_detec#t(DIAG4_10,"M41")|str_detect(DIAG4_11,"M41")|str_detect(DIAG4_12,"M41"), 1, NA),
-#      icd_R13 = if_else(str_detect(DIAG4_01,"R13")|str_detect(DIAG4_02,"R13")|str_detect(DIAG4_03,"R13")|str_detect(DIAG4_04,"R13")|str_de#tect(DIAG4_05,"R13")|str_detect(DIAG4_06,"R13")|str_detect(DIAG4_07,"R13")|str_detect(DIAG4_08,"R13")|str_detect(DIAG4_09,"R13")|str_detec#t(DIAG4_10,"R13")|str_detect(DIAG4_11,"R13")|str_detect(DIAG4_12,"R13"),1, NA),
-#      icd_Z99 = if_else(str_detect(DIAG4_01,"Z99")|str_detect(DIAG4_02,"Z99")|str_detect(DIAG4_03,"Z99")|str_detect(DIAG4_04,"Z99")|str_de#tect(DIAG4_05,"Z99")|str_detect(DIAG4_06,"Z99")|str_detect(DIAG4_07,"Z99")|str_detect(DIAG4_08,"Z99")|str_detect(DIAG4_09,"Z99")|str_detec#t(DIAG4_10,"Z99")|str_detect(DIAG4_11,"Z99")|str_detect(DIAG4_12,"Z99"), 1, NA),
-#      icd_U80 = if_else(str_detect(DIAG4_01,"U80")|str_detect(DIAG4_02,"U80")|str_detect(DIAG4_03,"U80")|str_detect(DIAG4_04,"U80")|str_de#tect(DIAG4_05,"U80")|str_detect(DIAG4_06,"U80")|str_detect(DIAG4_07,"U80")|str_detect(DIAG4_08,"U80")|str_detect(DIAG4_09,"U80")|str_detec#t(DIAG4_10,"U80")|str_detect(DIAG4_11,"U80")|str_detect(DIAG4_12,"U80"),  1, NA),
-#      icd_M80 = if_else(str_detect(DIAG4_01,"M80")|str_detect(DIAG4_02,"M80")|str_detect(DIAG4_03,"M80")|str_detect(DIAG4_04,"M80")|str_de#tect(DIAG4_05,"M80")|str_detect(DIAG4_06,"M80")|str_detect(DIAG4_07,"M80")|str_detect(DIAG4_08,"M80")|str_detect(DIAG4_09,"M80")|str_detec#t(DIAG4_10,"M80")|str_detect(DIAG4_11,"M80")|str_detect(DIAG4_12,"M80"),  1, NA),
-#      icd_K92 = if_else(str_detect(DIAG4_01,"K92")|str_detect(DIAG4_02,"K92")|str_detect(DIAG4_03,"K92")|str_detect(DIAG4_04,"K92")|str_de#tect(DIAG4_05,"K92")|str_detect(DIAG4_06,"K92")|str_detect(DIAG4_07,"K92")|str_detect(DIAG4_08,"K92")|str_detect(DIAG4_09,"K92")|str_detec#t(DIAG4_10,"K92")|str_detect(DIAG4_11,"K92")|str_detect(DIAG4_12,"K92"),  1, NA),
-#      icd_I63 = if_else(str_detect(DIAG4_01,"I63")|str_detect(DIAG4_02,"I63")|str_detect(DIAG4_03,"I63")|str_detect(DIAG4_04,"I63")|str_de#tect(DIAG4_05,"I63")|str_detect(DIAG4_06,"I63")|str_detect(DIAG4_07,"I63")|str_detect(DIAG4_08,"I63")|str_detect(DIAG4_09,"I63")|str_detec#t(DIAG4_10,"I63")|str_detect(DIAG4_11,"I63")|str_detect(DIAG4_12,"I63"), 1, NA),
-#      icd_J22 = if_else(str_detect(DIAG4_01,"J22")|str_detect(DIAG4_02,"J22")|str_detect(DIAG4_03,"J22")|str_detect(DIAG4_04,"J22")|str_de#tect(DIAG4_05,"J22")|str_detect(DIAG4_06,"J22")|str_detect(DIAG4_07,"J22")|str_detect(DIAG4_08,"J22")|str_detect(DIAG4_09,"J22")|str_detec#t(DIAG4_10,"J22")|str_detect(DIAG4_11,"J22")|str_detect(DIAG4_12,"J22"),  1, NA),
-#      icd_N20 = if_else(str_detect(DIAG4_01,"N20")|str_detect(DIAG4_02,"N20")|str_detect(DIAG4_03,"N20")|str_detect(DIAG4_04,"N20")|str_de#tect(DIAG4_05,"N20")|str_detect(DIAG4_06,"N20")|str_detect(DIAG4_07,"N20")|str_detect(DIAG4_08,"N20")|str_detect(DIAG4_09,"N20")|str_detec#t(DIAG4_10,"N20")|str_detect(DIAG4_11,"N20")|str_detect(DIAG4_12,"N20"),  1, NA),
-#      icd_F10 = if_else(str_detect(DIAG4_01,"F10")|str_detect(DIAG4_02,"F10")|str_detect(DIAG4_03,"F10")|str_detect(DIAG4_04,"F10")|str_de#tect(DIAG4_05,"F10")|str_detect(DIAG4_06,"F10")|str_detect(DIAG4_07,"F10")|str_detect(DIAG4_08,"F10")|str_detect(DIAG4_09,"F10")|str_detec#t(DIAG4_10,"F10")|str_detect(DIAG4_11,"F10")|str_detect(DIAG4_12,"F10"), 1, NA),
-#      icd_Y84 = if_else(str_detect(DIAG4_01,"Y84")|str_detect(DIAG4_02,"Y84")|str_detect(DIAG4_03,"Y84")|str_detect(DIAG4_04,"Y84")|str_de#tect(DIAG4_05,"Y84")|str_detect(DIAG4_06,"Y84")|str_detect(DIAG4_07,"Y84")|str_detect(DIAG4_08,"Y84")|str_detect(DIAG4_09,"Y84")|str_detec#t(DIAG4_10,"Y84")|str_detect(DIAG4_11,"Y84")|str_detect(DIAG4_12,"Y84"),  1, NA),
-#      icd_R00 = if_else(str_detect(DIAG4_01,"R00")|str_detect(DIAG4_02,"R00")|str_detect(DIAG4_03,"R00")|str_detect(DIAG4_04,"R00")|str_de#tect(DIAG4_05,"R00")|str_detect(DIAG4_06,"R00")|str_detect(DIAG4_07,"R00")|str_detect(DIAG4_08,"R00")|str_detect(DIAG4_09,"R00")|str_detec#t(DIAG4_10,"R00")|str_detect(DIAG4_11,"R00")|str_detect(DIAG4_12,"R00"),  1, NA),
-#      icd_Z73 = if_else(str_detect(DIAG4_01,"Z73")|str_detect(DIAG4_02,"Z73")|str_detect(DIAG4_03,"Z73")|str_detect(DIAG4_04,"Z73")|str_de#tect(DIAG4_05,"Z73")|str_detect(DIAG4_06,"Z73")|str_detect(DIAG4_07,"Z73")|str_detect(DIAG4_08,"Z73")|str_detect(DIAG4_09,"Z73")|str_detec#t(DIAG4_10,"Z73")|str_detect(DIAG4_11,"Z73")|str_detect(DIAG4_12,"Z73"), 1, NA),
-#      icd_R79 = if_else(str_detect(DIAG4_01,"R79")|str_detect(DIAG4_02,"R79")|str_detect(DIAG4_03,"R79")|str_detect(DIAG4_04,"R79")|str_de#tect(DIAG4_05,"R79")|str_detect(DIAG4_06,"R79")|str_detect(DIAG4_07,"R79")|str_detect(DIAG4_08,"R79")|str_detect(DIAG4_09,"R79")|str_detec#t(DIAG4_10,"R79")|str_detect(DIAG4_11,"R79")|str_detect(DIAG4_12,"R79"),  1, NA),
-#      icd_Z91 = if_else(str_detect(DIAG4_01,"Z91")|str_detect(DIAG4_02,"Z91")|str_detect(DIAG4_03,"Z91")|str_detect(DIAG4_04,"Z91")|str_de#tect(DIAG4_05,"Z91")|str_detect(DIAG4_06,"Z91")|str_detect(DIAG4_07,"Z91")|str_detect(DIAG4_08,"Z91")|str_detect(DIAG4_09,"Z91")|str_detec#t(DIAG4_10,"Z91")|str_detect(DIAG4_11,"Z91")|str_detect(DIAG4_12,"Z91"),  1, NA),
-#      icd_S51 = if_else(str_detect(DIAG4_01,"S51")|str_detect(DIAG4_02,"S51")|str_detect(DIAG4_03,"S51")|str_detect(DIAG4_04,"S51")|str_de#tect(DIAG4_05,"S51")|str_detect(DIAG4_06,"S51")|str_detect(DIAG4_07,"S51")|str_detect(DIAG4_08,"S51")|str_detect(DIAG4_09,"S51")|str_detec#t(DIAG4_10,"S51")|str_detect(DIAG4_11,"S51")|str_detect(DIAG4_12,"S51"),  1, NA),
-#      icd_F32 = if_else(str_detect(DIAG4_01,"F32")|str_detect(DIAG4_02,"F32")|str_detect(DIAG4_03,"F32")|str_detect(DIAG4_04,"F32")|str_de#tect(DIAG4_05,"F32")|str_detect(DIAG4_06,"F32")|str_detect(DIAG4_07,"F32")|str_detect(DIAG4_08,"F32")|str_detect(DIAG4_09,"F32")|str_detec#t(DIAG4_10,"F32")|str_detect(DIAG4_11,"F32")|str_detect(DIAG4_12,"F32"),  1, NA),
-#      icd_M48 = if_else(str_detect(DIAG4_01,"M48")|str_detect(DIAG4_02,"M48")|str_detect(DIAG4_03,"M48")|str_detect(DIAG4_04,"M48")|str_de#tect(DIAG4_05,"M48")|str_detect(DIAG4_06,"M48")|str_detect(DIAG4_07,"M48")|str_detect(DIAG4_08,"M48")|str_detect(DIAG4_09,"M48")|str_detec#t(DIAG4_10,"M48")|str_detect(DIAG4_11,"M48")|str_detect(DIAG4_12,"M48"),  1, NA),
-#      icd_E83 = if_else(str_detect(DIAG4_01,"E83")|str_detect(DIAG4_02,"E83")|str_detect(DIAG4_03,"E83")|str_detect(DIAG4_04,"E83")|str_de#tect(DIAG4_05,"E83")|str_detect(DIAG4_06,"E83")|str_detect(DIAG4_07,"E83")|str_detect(DIAG4_08,"E83")|str_detect(DIAG4_09,"E83")|str_detec#t(DIAG4_10,"E83")|str_detect(DIAG4_11,"E83")|str_detect(DIAG4_12,"E83"), 1, NA),
-#      icd_M15 = if_else(str_detect(DIAG4_01,"M15")|str_detect(DIAG4_02,"M15")|str_detect(DIAG4_03,"M15")|str_detect(DIAG4_04,"M15")|str_de#tect(DIAG4_05,"M15")|str_detect(DIAG4_06,"M15")|str_detect(DIAG4_07,"M15")|str_detect(DIAG4_08,"M15")|str_detect(DIAG4_09,"M15")|str_detec#t(DIAG4_10,"M15")|str_detect(DIAG4_11,"M15")|str_detect(DIAG4_12,"M15"),  1, NA),
-#      icd_D64 = if_else(str_detect(DIAG4_01,"D64")|str_detect(DIAG4_02,"D64")|str_detect(DIAG4_03,"D64")|str_detect(DIAG4_04,"D64")|str_de#tect(DIAG4_05,"D64")|str_detect(DIAG4_06,"D64")|str_detect(DIAG4_07,"D64")|str_detect(DIAG4_08,"D64")|str_detect(DIAG4_09,"D64")|str_detec#t(DIAG4_10,"D64")|str_detect(DIAG4_11,"D64")|str_detect(DIAG4_12,"D64"), 1, NA),
-#      icd_L08 = if_else(str_detect(DIAG4_01,"L08")|str_detect(DIAG4_02,"L08")|str_detect(DIAG4_03,"L08")|str_detect(DIAG4_04,"L08")|str_de#tect(DIAG4_05,"L08")|str_detect(DIAG4_06,"L08")|str_detect(DIAG4_07,"L08")|str_detect(DIAG4_08,"L08")|str_detect(DIAG4_09,"L08")|str_detec#t(DIAG4_10,"L08")|str_detect(DIAG4_11,"L08")|str_detect(DIAG4_12,"L08"), 1, NA),
-#      icd_R11 = if_else(str_detect(DIAG4_01,"R11")|str_detect(DIAG4_02,"R11")|str_detect(DIAG4_03,"R11")|str_detect(DIAG4_04,"R11")|str_de#tect(DIAG4_05,"R11")|str_detect(DIAG4_06,"R11")|str_detect(DIAG4_07,"R11")|str_detect(DIAG4_08,"R11")|str_detect(DIAG4_09,"R11")|str_detec#t(DIAG4_10,"R11")|str_detect(DIAG4_11,"R11")|str_detect(DIAG4_12,"R11"),  1, NA),
-#      icd_K52 = if_else(str_detect(DIAG4_01,"K52")|str_detect(DIAG4_02,"K52")|str_detect(DIAG4_03,"K52")|str_detect(DIAG4_04,"K52")|str_de#tect(DIAG4_05,"K52")|str_detect(DIAG4_06,"K52")|str_detect(DIAG4_07,"K52")|str_detect(DIAG4_08,"K52")|str_detect(DIAG4_09,"K52")|str_detec#t(DIAG4_10,"K52")|str_detect(DIAG4_11,"K52")|str_detect(DIAG4_12,"K52"), 1, NA),
-#      icd_R50 = if_else(str_detect(DIAG4_01,"R50")|str_detect(DIAG4_02,"R50")|str_detect(DIAG4_03,"R50")|str_detect(DIAG4_04,"R50")|str_de#tect(DIAG4_05,"R50")|str_detect(DIAG4_06,"R50")|str_detect(DIAG4_07,"R50")|str_detect(DIAG4_08,"R50")|str_detect(DIAG4_09,"R50")|str_detec#t(DIAG4_10,"R50")|str_detect(DIAG4_11,"R50")|str_detect(DIAG4_12,"R50"), 1, NA))
-```
-
-Fill all columns and create one line per patient:
-```{r}
-#frailty_table3<-frailty_table2 %>% 
-#  group_by(PSEUDO_PAT) %>% 
-#  fill(everything()) %>% 
-#  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-#  select(PSEUDO_PAT, icd_F00:icd_R50)
-#
-#frailty_table3 %>% 
-#  ungroup() %>% 
-#  skimr::skim() %>% 
-#  arrange(complete_rate)
-#
-#frailty_table3<-frailty_table3 %>% 
-#  mutate(icd_F00=ifelse(is.na(icd_F00),0,icd_F00),
-#                        icd_G81=ifelse(is.na(icd_G81),0,icd_G81),
-#         icd_G81=ifelse(is.na(icd_G81),0,icd_G81),
-#         icd_G30=ifelse(is.na(icd_G30),0,icd_G30),
-#         icd_I69=ifelse(is.na(icd_I69),0,icd_I69),
-#         icd_R29=ifelse(is.na(icd_R29),0,icd_R29),
-#         icd_N39=ifelse(is.na(icd_N39),0,icd_N39),
-#         
-#         icd_W19=ifelse(is.na(icd_W19),0,icd_W19),
-#         icd_S00=ifelse(is.na(icd_S00),0,icd_S00),
-#         icd_R31=ifelse(is.na(icd_R31),0,icd_R31),
-#         
-#         icd_B96=ifelse(is.na(icd_B96),0,icd_B96),
-#         icd_R41=ifelse(is.na(icd_R41),0,icd_R41),
-#         icd_R26=ifelse(is.na(icd_R26),0,icd_R26),
-#         icd_I67=ifelse(is.na(icd_I67),0,icd_I67),
-#         icd_R56=ifelse(is.na(icd_R56),0,icd_R56),
-#         icd_R40=ifelse(is.na(icd_R40),0,icd_R40),
-#         icd_T83=ifelse(is.na(icd_T83),0,icd_T83),
-#         icd_S06=ifelse(is.na(icd_S06),0,icd_S06),
-#         icd_S42=ifelse(is.na(icd_S42),0,icd_S42),
-#         icd_E87=ifelse(is.na(icd_E87),0,icd_E87))
-#         
-# frailty_table3<- frailty_table3 %>% 
-#  mutate(icd_M25=ifelse(is.na(icd_M25),0,icd_M25),
-#                        icd_E86=ifelse(is.na(icd_E86),0,icd_E86),
-#         icd_R54=ifelse(is.na(icd_R54),0,icd_R54),
-#         icd_Z50=ifelse(is.na(icd_Z50),0,icd_Z50),
-#         icd_F03=ifelse(is.na(icd_F03),0,icd_F03),
-#         icd_W18=ifelse(is.na(icd_W18),0,icd_W18),
-#         icd_Z75=ifelse(is.na(icd_Z75),0,icd_Z75),
-#         
-#         icd_F01=ifelse(is.na(icd_F01),0,icd_F01),
-#         icd_S80=ifelse(is.na(icd_S80),0,icd_S80),
-#         icd_L03=ifelse(is.na(icd_L03),0,icd_L03),
-#         
-#         icd_H54=ifelse(is.na(icd_H54),0,icd_H54),
-#         icd_E53=ifelse(is.na(icd_E53),0,icd_E53),
-#         icd_Z60=ifelse(is.na(icd_Z60),0,icd_Z60),
-#         icd_G20=ifelse(is.na(icd_G20),0,icd_G20),
-#         icd_R55=ifelse(is.na(icd_R55),0,icd_R55),
-#         icd_S22=ifelse(is.na(icd_S22),0,icd_S22),
-#         icd_K59=ifelse(is.na(icd_K59),0,icd_K59),
-#         icd_N17=ifelse(is.na(icd_N17),0,icd_N17),
-#         icd_L89=ifelse(is.na(icd_L89),0,icd_L89),
-#         icd_Z22=ifelse(is.na(icd_Z22),0,icd_Z22))
-# 
-# frailty_table3<- frailty_table3 %>% 
-#  mutate(icd_B95=ifelse(is.na(icd_B95),0,icd_B95),
-#                        icd_N19=ifelse(is.na(icd_N19),0,icd_N19),
-#         icd_A41=ifelse(is.na(icd_A41),0,icd_A41),
-#         icd_L97=ifelse(is.na(icd_L97),0,icd_L97),
-#         icd_R44=ifelse(is.na(icd_R44),0,icd_R44),
-#         icd_K26=ifelse(is.na(icd_K26),0,icd_K26),
-#         icd_I95=ifelse(is.na(icd_I95),0,icd_I95),
-#         
-#         icd_Z87=ifelse(is.na(icd_Z87),0,icd_Z87),
-#         icd_J96=ifelse(is.na(icd_J96),0,icd_J96),
-#         icd_X59=ifelse(is.na(icd_X59),0,icd_X59),
-#         
-#         icd_M19=ifelse(is.na(icd_M19),0,icd_M19),
-#         icd_G40=ifelse(is.na(icd_G40),0,icd_G40),
-#         icd_M81=ifelse(is.na(icd_M81),0,icd_M81),
-#         icd_S72=ifelse(is.na(icd_S72),0,icd_S72),
-#         icd_S32=ifelse(is.na(icd_S32),0,icd_S32),
-#         icd_E16=ifelse(is.na(icd_E16),0,icd_E16),
-#         icd_R94=ifelse(is.na(icd_R94),0,icd_R94),
-#         icd_N18=ifelse(is.na(icd_N18),0,icd_N18),
-#         icd_R33=ifelse(is.na(icd_R33),0,icd_R33),
-#         icd_R69=ifelse(is.na(icd_R69),0,icd_R69))
-# 
-# 
-# frailty_table3<- frailty_table3 %>% 
-#  mutate(icd_N28=ifelse(is.na(icd_N28),0,icd_N28),
-#                        icd_R32=ifelse(is.na(icd_R32),0,icd_R32),
-#         icd_G31=ifelse(is.na(icd_G31),0,icd_G31),
-#         icd_Y95=ifelse(is.na(icd_Y95),0,icd_Y95),
-#         icd_S09=ifelse(is.na(icd_S09),0,icd_S09),
-#         icd_R45=ifelse(is.na(icd_R45),0,icd_R45),
-#         icd_G45=ifelse(is.na(icd_G45),0,icd_G45),
-#         
-#         icd_S01=ifelse(is.na(icd_S01),0,icd_S01),
-#         icd_A04=ifelse(is.na(icd_A04),0,icd_A04),
-#         icd_A09=ifelse(is.na(icd_A09),0,icd_A09),
-#         
-#         icd_J18=ifelse(is.na(icd_J18),0,icd_J18),
-#         icd_Z74=ifelse(is.na(icd_Z74),0,icd_Z74),
-#         icd_M79=ifelse(is.na(icd_M79),0,icd_M79),
-#         icd_W06=ifelse(is.na(icd_W06),0,icd_W06),
-#         icd_J69=ifelse(is.na(icd_J69),0,icd_J69),
-#         icd_R47=ifelse(is.na(icd_R47),0,icd_R47),
-#         icd_E55=ifelse(is.na(icd_E55),0,icd_E55),
-#         icd_Z93=ifelse(is.na(icd_Z93),0,icd_Z93),
-#         icd_R02=ifelse(is.na(icd_R02),0,icd_R02),
-#         icd_R63=ifelse(is.na(icd_R63),0,icd_R63))
-# 
-# 
-# frailty_table3<- frailty_table3 %>% 
-#  mutate(icd_H91=ifelse(is.na(icd_H91),0,icd_H91),
-#                        icd_W10=ifelse(is.na(icd_W10),0,icd_W10),
-#         icd_W01=ifelse(is.na(icd_W01),0,icd_W01),
-#         icd_E05=ifelse(is.na(icd_E05),0,icd_E05),
-#         icd_M41=ifelse(is.na(icd_M41),0,icd_M41),
-#         icd_R13=ifelse(is.na(icd_R13),0,icd_R13),
-#         icd_Z99=ifelse(is.na(icd_Z99),0,icd_Z99),
-#         
-#         icd_U80=ifelse(is.na(icd_U80),0,icd_U80),
-#         icd_M80=ifelse(is.na(icd_M80),0,icd_M80),
-#         icd_K92=ifelse(is.na(icd_K92),0,icd_K92),
-#         
-#         icd_I63=ifelse(is.na(icd_I63),0,icd_I63),
-#         icd_J22=ifelse(is.na(icd_J22),0,icd_J22),
-#         icd_N20=ifelse(is.na(icd_N20),0,icd_N20),
-#         icd_F10=ifelse(is.na(icd_F10),0,icd_F10),
-#         icd_Y84=ifelse(is.na(icd_Y84),0,icd_Y84),
-#         icd_R00=ifelse(is.na(icd_R00),0,icd_R00),
-#         icd_R79=ifelse(is.na(icd_R79),0,icd_R79),
-#         icd_Z91=ifelse(is.na(icd_Z91),0,icd_Z91),
-#         icd_S51=ifelse(is.na(icd_S51),0,icd_S51))
-# 
-# frailty_table3<-  frailty_table3 %>% 
-#  mutate(icd_Z73=ifelse(is.na(icd_Z73),0,icd_Z73),
-#                        icd_F32=ifelse(is.na(icd_F32),0,icd_F32),
-#         icd_M48=ifelse(is.na(icd_M48),0,icd_M48),
-#         icd_E83=ifelse(is.na(icd_E83),0,icd_E83),
-#         icd_M15=ifelse(is.na(icd_M15),0,icd_M15),
-#         icd_D64=ifelse(is.na(icd_D64),0,icd_D64),
-#         icd_L08=ifelse(is.na(icd_L08),0,icd_L08),
-#         
-#         icd_R11=ifelse(is.na(icd_R11),0,icd_R11),
-#         icd_K52=ifelse(is.na(icd_K52),0,icd_K52),
-#         icd_R50=ifelse(is.na(icd_R50),0,icd_R50))
-
-```
-
-
-Merge PS to the cohort and retain only this with complete PS. This is required as the outcome of the logistic regression model to determine association of diagnoses with the outcome of recorded PS.
-```{r}
-#PStable<-read_csv(
-#  "PSscores.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#
-#ovariansurgerycohort %>% 
-#  count(PSEUDO_PAT)
-#
-#PS_regression_data<-PStable %>% 
-#  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-#  select(PSEUDO_PAT, PS) %>% 
-#  merge(frailty_table3, by = "PSEUDO_PAT") %>% 
-#  filter(!is.na(PS))
-#
-#PS_regression_data %>% 
-#  count(PSEUDO_PAT )#PS is poorly complete, 63% only, 2783 of 4444 patients retained
-```
-
-Remove any icd codes with no diagnoses as these cannot be input into the model:
-```{r}
-#PS_regression_data2<-PS_regression_data %>%
-#  mutate(PS=as.numeric(PS)) %>% 
-#  select_if(is.numeric) %>% 
-#  select_if(~sum(.x)>7)
-#
-#PS_regression_data2 %>% 
-#  ungroup() %>% 
-#  skimr::skim()
-```
-
-
-Convert the data to the desired format and calculate estimates for each explanatory icd diagnosis relative to the outcome of PS:
-```{r}
-#library(glmnet)
-#x <- as.matrix(PS_regression_data2 %>% select(-PS)) #Select ICD codes needed to specify the model
-#y <- as.matrix(PS_regression_data2 %>% select(PS)) #Select the outcome of PS only.
-#
-#mlt_fit<-glmnet(x, y, family = "multinomial", alpha = 0, type.multinomial = "grouped")
-#
-#plot(mlt_fit, xvar = "lambda", label = TRUE, type.coef = "2norm") #Plot the fit of the explanatory variables (binary ICD codes) on outcome #of performance status
-
-```
-
-Cross validated `glmnet`, let `glmnet` choose a default matrix of 100 lambdas.
-`lambda.min` is the value of lambda that gives minimum mean cross-validated error. The other lambda saved is `lambda.1se`, which gives the most regularized model such that error is within one standard error of the minimum.
-
-```{r}
-#cv_fit <- cv.glmnet(x, y, family = "multinomial", alpha = 0, type.multinomial = "grouped", nfolds = 3)
-#
-#plot(cv_fit)
-#
-## select min value of lambda
-#cv_fit$lambda.min
-#
-#cvfit <- cv.glmnet(x, y,alpha = 0)
-#
-#plot(cvfit)
-#
-## select min value of lambda
-#cvfit$lambda.min
-#
-#cvfit$lambda
-```
-
-Predict using the min lambda or a matrix of lambdas that are close to your `lambda.min`
-Predict the outcome class using the minimum value of lambda, which gives the cross validation subject to the minimum error. After running this code we have predicted performance status based on icd codes contained in the HES data within one year of start of SACT.
-Also see https://stats.stackexchange.com/questions/138569/why-is-lambda-within-one-standard-error-from-the-minimum-is-a-recommended-value
-```{r}
-#model_prediction<-predict(cv_fit, x, type = "class", 
-#        s=cv.glmnet(x, y, family = "multinomial", alpha = 0, type.multinomial = "grouped", nfolds = 3)$lambda.min)
-```
-
-Then attach predicted PS to each patient record:
-```{r}
-#ovariansurgerycohort<-model_prediction %>% 
-#  merge(ovariansurgerycohort, by = "PSEUDO_PAT")
-```
-
-Rename dataset for clarity:
-```{r}
-#cohort<-ovariansurgerycohort
-```
 
 Write csv for quicker use:
 ```{r}
@@ -1316,24 +941,17 @@ ovariansurgerycohort %>%
 Read csv:
 ```{r}
 ovariansurgerycohort <-read_csv(
-  "surgery_final_cohort_4NOV24.csv",
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 7 - Time to adjuvant chemotherapy\\surgery_final_cohort_4NOV24.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL)
 
-codes<-ovariansurgerycohort %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(PSEUDO_PAT, ORGANISATION_CODE_OF_PROVIDER)
+ovariansurgerycohort %>% 
+  count(PSEUDO_PAT)#n=4,002
 
-icb <-read_csv(
-  "eccg.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL) %>% 
-  rename('Integrated Care Board'=...2) %>% 
-  rename(Code=1) %>% 
-  distinct(Code,.keep_all=T) %>% 
-  select(1,2)
+codes<-ovariansurgerycohort %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% #N=4,434
+  select(PSEUDO_PAT, ORGANISATION_CODE_OF_PROVIDER)
 ```
 
 
@@ -1356,8 +974,8 @@ cohort<-ovariansurgerycohort %>%
 #  select(PSEUDO_PAT, INDEX) %>% 
 #  merge(cohort,by="PSEUDO_PAT")
 
-cohort %>% 
-  count(PSEUDO_PAT) #n=4619
+cohort %>%
+  count(PSEUDO_PAT)#n=4,002
 
 cohort2<-cohort %>% 
   group_by(PSEUDO_PAT) %>%
@@ -1376,11 +994,11 @@ cohort2 %>%
 Check PDS and IDS have been properly assigned to all patients:
 ```{r}
 cohort<-cohort2 %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) #n=4444 patients in the analysis cohort1
+  distinct(PSEUDO_PAT,.keep_all=T) #n=4,434 patients in the analysis cohort1
 
 cohort%>% 
   ungroup() %>% 
-  count(modality) #no patients with no assigned surgical strategy. n=2679 IDS, n=1940 IDS
+  count(modality) #no patients with no assigned surgical strategy. n=2,573 IDS, n=1,861 PDS
 ```
 
 Link the bevacizumab flag to incoporate into survival analysis:
@@ -1413,7 +1031,7 @@ cohort<-cohort %>%
   distinct(PSEUDO_PAT,.keep_all=T)
 
 cohort %>% 
-  count(EVENT) #n=2448 patients died within 5 years. n=2171 survived beyond 5 years. n=2 have missing VITALSTATUS and were censored at the 5 year timepoint
+  count(EVENT) #n=2,468/4,434 patients died within 5 years. n=1,966 survived beyond 5 years. 
 
 ```
 
@@ -1448,9 +1066,85 @@ skimr_nhs_site %>%
  ggplot(skimr_nhs_site, aes(y  = complete_rate, fill = "Treating centre")) +
  geom_histogram() +scale_y_continuous(seq(0:100))+ggtitle("Completeness of BMI") +labs(x="Number of sites",y="completeness")+theme(plot.title = element_text(hjust=0.5))+labs(y="%")
 ```
+#Import cycle tables containing PS
+```{r}
+cohort %>% 
+  select(PS) %>% 
+  skimr::skim()
+
+#load origina tables containing PS
+load("SACTCYCLENEW_2019.rda")
+
+SACTCYCLEOLD_2019<-read_csv(
+ "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/ODR1920_080 SACTCYCLEOLD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+load("SACTREGIMENNEW_2019.rda")
+load("SACTREGIMENOLD_2019.rda")
+load("SACTTUMOURNEW_2019.rda")
+load("SACTTUMOUROLD_2019.rda")
+
+#Merge with tumour table to link PSEUDO_PAT
+PS_new<-SACTTUMOURNEW_2019 %>% 
+  merge(SACTCYCLENEW_2019,by=c("PSEUDO_PAT","PSEUDO_ENCORE_TUMOUR_ID")) %>% 
+  filter(!is.na(PS)) %>% 
+  select(PSEUDO_PAT,PSEUDO_ENCORE_TUMOUR_ID,PS) %>% 
+  rename(PSEUDO_TUMOURID=PSEUDO_ENCORE_TUMOUR_ID)
+
+PS_OLD<-SACTTUMOUROLD_2019 %>% 
+  merge(SACTCYCLEOLD_2019,by=c("PSEUDO_MERGED_PATIENT_ID","PSEUDO_MERGED_TUMOUR_ID")) %>% 
+  filter(!is.na(PERF_STAT_START_OF_CYCLE_CLEAN)) %>% 
+  select(PSEUDO_PAT,PSEUDO_TUMOURID,PERF_STAT_START_OF_CYCLE_CLEAN) %>% 
+  rename(PS=PERF_STAT_START_OF_CYCLE_CLEAN)
+
+#Bind all PS data
+PS_all<-rbind(PS_new,PS_OLD) %>% 
+mutate(PS=as.numeric(PS))
+
+#Take the mean  PS for each TUMOURID as this will choose the most commonly assigned PS during the patient's treatment
+PS_all<-PS_all %>% 
+group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
+  mutate(PS=mean(PS)) %>% 
+  ungroup()
+
+#Round to nearest whole number
+PS_all$PS<-  round(PS_all$PS)
+
+#Keep value for each PSEUDO_TUMOURID
+PS_all<-PS_all %>% 
+  distinct(PSEUDO_PAT, PSEUDO_TUMOURID,.keep_all=T)
+
+#Merge available PS to the dataset:
+cohort<-cohort %>% 
+  left_join(PS_all, by = c("PSEUDO_PAT", "PSEUDO_TUMOURID")) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(-PS.x) %>% 
+  rename(PS=PS.y)
 
 
-MICE: Select variables for multiple imputation. This is to impute the BMI value for patients with missing height and weight data, to incorprate into survival analysis. 
+cohort %>% 
+  select(PS) %>% 
+  summary()
+
+cohort<-cohort %>% 
+  #mutate(PS=as.numeric(PS)) %>% 
+  #filter(!is.na(PS)) %>% #n=3414 for complete case analysis
+  mutate(PS=ifelse(PS>1,2,PS))
+
+
+cohort<-cohort %>% 
+  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "2"),"2",STAGE_BEST_CLEAN)) %>% 
+  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "3"),"3",STAGE_BEST_CLEAN)) %>% 
+  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "4"),"4",STAGE_BEST_CLEAN))
+
+cohort %>% 
+  select(PS) %>% 
+  skimr::skim() #PS 91.95% complete
+```
+
+MICE: Select variables for multiple imputation. This is to impute the BMI and PS values for patients with missing height and weight data, to incorprate into survival analysis. 
 MICE must include the outcome as part of the imputation model.
 PS is now part of this model as per David's suggestion:
 Select variables for imputation:
@@ -1458,10 +1152,12 @@ Select variables for imputation:
 imputationdataset <-cohort %>%
   mutate(BMI=as.numeric(BMI)) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(PSEUDO_PAT,modality, REGION, CENTRE_TYPE,ETHNICITYNAME,BMI,IMD2015_1, AGECATEGORY,bevflag,STAGE_BEST_CLEAN, overall_survival, EVENT)
+  select(PSEUDO_PAT,modality, REGION, CENTRE_TYPE,ETHNICITYNAME,BMI,IMD2015_1,PS, AGECATEGORY,bevflag,STAGE_BEST_CLEAN, overall_survival, EVENT)
 
 imputationdataset %>% 
-  skimr::skim() #86.4% complete
+  skimr::skim() #BMI 98.3% complete, PS 91.9% complete
+
+#These data will be imputed to allow for improved survival analysis
 ```
 
 Multiple imputation of missing data:
@@ -1477,19 +1173,44 @@ completedData %>%
   skimr::skim()
 ```
 
-Then check the distribution of imputed data to the observed:
+Then check the distribution of imputed BMI data to the observed:
 ```{r}
 xyplot(tempData,~ BMI,pch=18,cex=1) #this code shows the distribution of imputed values against observed values
+xyplot(tempData,~ PS,pch=18,cex=1) #this code shows the distribution of imputed values against observed values
 
 densityplot( x=tempData , data= tempData~BMI)#this code will plot a histogram of the imputed data against the observed data
+densityplot( x=tempData , data= tempData~PS)#this code will plot a histogram of the imputed data against the observed data
+
 ```
-rename to completed dataset to cohort for analysis:
+
+Relink ethnicity and IMD as some of these data were lost in linkage:
+Rejoin to original table:
+```{r}
+#demographic_table %>% 
+#  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+#  merge(cohort,by="PSEUDO_PAT") %>% 
+#  select(ETHNICITYNAME.x,ETHNICITYNAME.y) %>% 
+#  skimr::skim()
+#
+#cohort %>% 
+#  skimr::skim()
+#
+#cohort %>% 
+#  group_by(PSEUDO_PAT) %>% 
+#  fill(ETHNICITYNAME,.direction="updown") %>% 
+#  select(ETHNICITYNAME) %>% 
+#  ungroup() %>% 
+#  skimr::skim()
+```
+
+
+Rename to completed dataset to cohort for analysis:
 ```{r}
 cohort<-cohort %>% 
-  select(-BMI)
+  select(-BMI,-PS)#Remove BMI and PS  from the cohort
 
 cohort2<-completedData %>% 
-  select(PSEUDO_PAT, BMI) %>% 
+  select(PSEUDO_PAT, BMI,PS) %>% #Link imputed BMI and PS values
   merge(cohort, by= "PSEUDO_PAT")
 
 imputationdataset %>% 
@@ -1499,6 +1220,7 @@ completedData %>%
   skimr::skim()
 
 cohort2$BMI2<-cut(cohort2$BMI, breaks=c(0,18.5, 25, 30, 40, 100), right = FALSE)
+cohort2$PS<-cut(cohort2$PS, breaks=c(0,1,2,10), right = FALSE)
 
 cohort<-cohort2
 
@@ -1506,51 +1228,11 @@ cohort2%>%
   ungroup() %>% 
   skimr::skim()
 ```
-Link PS:
-```{r}
 
-#Import cycle tables containing PS
-load("SACTCYCLENEW_2019.rda")
-load("SACTCYCLEOLD_2019.rda")
-
-load("SACTCYCLENEW_2019.rda")
-load("SACTCYCLEOLD_2019.rda")
-
-#Merge available PS to the dataset:
-cohort<-cohort %>% 
-  left_join(SACTCYCLENEW_2019, by = "PSEUDO_PAT") %>% 
-  distinct(PSEUDO_PAT,.keep_all=T)
-
-SACTCYCLEOLD_2019<-SACTCYCLEOLD_2019 %>% 
-  rename(PSEUDO_PAT=PSEUDO_MERGED_PATIENT_ID)#
-
-cohort<-cohort %>% 
-  left_join(SACTCYCLEOLD_2019, by = "PSEUDO_PAT") %>%
-  mutate(PS.y=ifelse(is.na(PS.y),PERF_STAT_START_OF_CYCLE_CLEAN,PS.y)) %>% 
-  rename(PS=PS.y) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T)
-
-cohort<-cohort %>% 
-  mutate(PS=as.numeric(PS)) %>% 
-  #filter(!is.na(PS)) %>% #n=3414 for complete case analysis
-  mutate(PS=ifelse(PS>1,2,PS))
-
-cohort$PS<-cut(cohort$PS, breaks=c(0,1,2,10), right = FALSE)
-
-cohort<-cohort %>% 
-    mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "2"),"2",STAGE_BEST_CLEAN)) %>% 
-
-  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "3"),"3",STAGE_BEST_CLEAN)) %>% 
-  mutate(STAGE_BEST_CLEAN=ifelse(str_detect(STAGE_BEST_CLEAN, "4"),"4",STAGE_BEST_CLEAN))
-
-cohort %>% 
-  select(PS) %>% 
-  skimr::skim()
-```
 Describe pattern of missingness of PS:
 Create histograms:
 ```{r}
-missing_data2<-cohort %>% 
+missing_data2<-cohort2 %>% 
   ungroup()
 
 skimr_PS_by_site<-missing_data2 %>% 
@@ -1571,18 +1253,25 @@ skimr_PS_by_site %>%
  ggplot(skimr_PS_by_site, aes(y  = complete_rate, fill = "Treating centre")) +
  geom_histogram() +scale_y_continuous(seq(0:100))+ggtitle("Completeness of performance status") +labs(x="Number of sites",y="completeness")+theme(plot.title = element_text(hjust=0.5))+labs(y="%")
 ```
+Recode ethnicity for analysis:
+```{r}
+cohort3<-cohort2 %>% 
+ mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "ASIAN|BLACK|CHINESE"),"Asian/Black",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED|NOT STATED|NOT KNOWN|Unknown"),"Mixed Race/Other/Unknown",ETHNICITY2))
+```
 
 Create table one by surgical status:
 ```{r}
-gfdsgfds
+cohort<-cohort3
 
-gfdsgfdgds
 completecase<-cohort %>% 
   filter(!is.na(PS)) %>% 
- select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE)
+ select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, `Commissioning region`, CENTRE_TYPE)
 
 cohort<-cohort %>% 
- select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY,  IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
   mutate(adjuvantbreak=as.numeric(adjuvantbreak)) %>% 
     mutate(AGE=as.numeric(AGE))
 
@@ -1598,26 +1287,13 @@ tableone%>%
   gt::gtsave("tableone.docx")
 ```
 
-Link ICB data
-```{r}
-cohort<-cohort %>%
-  merge(codes, by = "PSEUDO_PAT") %>% 
-  rename(Code=ORGANISATION_CODE_OF_PROVIDER)
-  
-fuzzyjoin::fuzzy_join(cohort,
-                      icb, 
-                      by = NULL,
-                      match_fun=TRUE)
-```
-
-
 
 Outcome 1a: Comparison of median time from surgery to adjuvant chemotherapy by ethnicity:
 ```{r}
 library(gtsummary)
 ethnicity<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITYNAME, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
-  tbl_summary(by="ETHNICITYNAME") %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+  tbl_summary(by="ETHNICITY2") %>% 
   add_p() %>% 
   add_n() %>% 
   add_overall()
@@ -1627,8 +1303,8 @@ ethnicity%>%
   gt::gtsave("adjuvanttimebyethnicity.docx")
 
 ethnicity_CATEGORY<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
-  tbl_summary(by="ETHNICITYCATEGORY") %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+  tbl_summary(by="ethnicitygroup") %>% 
   add_p() %>% 
   add_n() %>% 
   add_overall()
@@ -1641,7 +1317,7 @@ ethnicity_CATEGORY%>%
 Outcome 1b: Comparison of median time from surgery to adjuvant chemotherapy by age category:
 ```{r}
 age<-cohort %>% 
- select(modality, adjuvantbreak, adjuvantbreakcategory,bevflag,overall_survival,EVENT,BMI,BMI2,PS, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
   tbl_summary(by="AGECATEGORY") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1656,7 +1332,7 @@ Outcome 1c: Comparison of median time from surgery to adjuvant chemotherapy by I
 ```{r}
 imd<-cohort %>% 
   ungroup() %>% 
- select(modality, adjuvantbreak, adjuvantbreakcategory,bevflag,overall_survival,EVENT,BMI,BMI2,PS, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
   tbl_summary(by="IMD2015_1") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1671,7 +1347,7 @@ Outcome 1d: Compare time to surgery by region:
 ```{r}
 region<-cohort %>% 
    ungroup() %>% 
- select(modality, adjuvantbreak, adjuvantbreakcategory,bevflag,overall_survival,EVENT,BMI,BMI2,PS, ETHNICITYNAME,ETHNICITYCATEGORY, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
   tbl_summary(by=`Commissioning region`) %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1695,48 +1371,53 @@ cohortsurvival<-cohort %>%
 
 
 cohortsurvival %>% 
-  count(EVENT) #n=3429 die within 5 years, n=3098 survive 5 years or longer
+  count(EVENT) #n=2,182 die within 5 years, n=1,820 survive 5 years or longer
 
 cohortsurvival %>% 
  select(overall_survival, adjuvantbreak) %>% 
-  summary() #median adjuvant break was 42 days (IQR-32-54 days, range 6-179 days)
+  summary() #median adjuvant break was 39 days (IQR-30-49 days, range 3-90 days)
 cohortsurvival$modality<-as.factor(cohortsurvival$modality)
 
 cohortsurvival$modality<- relevel(cohortsurvival$modality, ref = "PDS")
 
-cohortsurvival$ETHNICITYNAME<-as.factor(cohortsurvival$ETHNICITYNAME)
+cohortsurvival$ETHNICITY2<-as.factor(cohortsurvival$ETHNICITY2)
 
 cohortsurvival$BMI2<-as.factor(cohortsurvival$BMI2)
 cohortsurvival$BMI2<- relevel(cohortsurvival$BMI2, ref = "[18.5,25)")
 
 cohortsurvival$bevflag<-as.factor(cohortsurvival$bevflag)
 cohortsurvival$bevflag<- relevel(cohortsurvival$bevflag, ref = "1")
-cohortsurvival$ETHNICITYNAME<- relevel(cohortsurvival$ETHNICITYNAME, ref = "White")
-cohortsurvival$ETHNICITYCATEGORY<-as.factor(cohortsurvival$ETHNICITYCATEGORY)
+cohortsurvival$ETHNICITY2<- relevel(cohortsurvival$ETHNICITY2, ref = "White")
+cohortsurvival$ethnicitygroup<-as.factor(cohortsurvival$ethnicitygroup)
 
-cohortsurvival$ETHNICITYCATEGORY<- relevel(cohortsurvival$ETHNICITYCATEGORY, ref = "White")
+cohortsurvival$ethnicitygroup<- relevel(cohortsurvival$ethnicitygroup, ref = "White")
 
 cohortsurvival %>% 
   ungroup() %>% 
   skimr::skim()
 
-survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ETHNICITYCATEGORY+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
+survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
 summary(survival)
 
 coxtable<-tbl_regression(survival, exponentiate = TRUE)%>% 
   add_n() #Gtsummary table for Cox regression analysis
-coxtable 
+coxtable %>% 
+  add_n() %>% 
+  as_gt() %>% 
+  gt::gtsave("cox_adjuvant_time_category.docx")
 ```
 
 Cox regression for adjuvant time as a continuous variable:
 ```{r}
-survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ETHNICITYCATEGORY+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
+survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
 summary(survival2)
 
 coxtable2<-tbl_regression(survival2, exponentiate = TRUE)%>% 
   add_n() #Gtsummary table for Cox regression analysis
 coxtable2 %>% 
-  add_n()
+  add_n() %>% 
+  as_gt() %>% 
+  gt::gtsave("cox_adjuvant_time_continuous.docx")
 ```
 
 
@@ -1766,7 +1447,7 @@ kmcurveplot_PDS<-ggsurvplot(kmcurvePDS,
            risk.table.y.text.col=T,
            risk.table.y.text=T,
            ncensor.plot=FALSE,srv.median.line="hv",
-           legend.labs=c("<=8 weeks","8< weeks"))
+           legend.labs=c("<=6 weeks","6< weeks"))
 
 kmcurveplot_PDS
 ```
@@ -1798,17 +1479,13 @@ kmcurveplot_IDS<-ggsurvplot(kmcurveIDS,
            risk.table.y.text.col=T,
            risk.table.y.text=T,
            ncensor.plot=FALSE,srv.median.line="hv",
-           legend.labs=c("<=8 weeks","8< weeks"))
+            legend.labs=c("<=6 weeks","6< weeks"))
 kmcurveplot_IDS
 ```
 Cut PS into 0,1,>1 for Cox
 Cox regression: 5 year OS for PDS only
 ```{r}
-pds_analysis$ETHNICITYCATEGORY<- relevel(pds_analysis$ETHNICITYCATEGORY, ref = "White")
-pds_analysis$ETHNICITYCATEGORY<- relevel(pds_analysis$ETHNICITYCATEGORY, ref = "White")
-
-
-survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=pds_analysis)
+survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITY2+IMD2015_1,data=pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1819,14 +1496,14 @@ coxtable_PDS_only
 
 
 
-coxtable_PDS_only%>%
+coxtable_PDS_only%>% 
   as_gt() %>% 
   gt::gtsave("cox_regression_PDS_only.docx")
 ```
 
 Cox regression: 5 year OS for IDS only
 ```{r}
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=ids_analysis)
+survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1841,10 +1518,10 @@ coxtable_IDS_only%>%
 Complete case analysis using only patients with a complete PS from the NCRD/SACT dataset:
 ```{r}
 completecase %>% 
-  count(PSEUDO_PAT) #n=3228
+  count(PSEUDO_PAT) #n=3,753
 
-completecase$ETHNICITYCATEGORY<-as.factor(completecase$ETHNICITYCATEGORY)
-completecase$ETHNICITYCATEGORY<- relevel(completecase$ETHNICITYCATEGORY, ref = "White")
+completecase$ethnicitygroup<-as.factor(completecase$ethnicitygroup)
+completecase$ethnicitygroup<- relevel(completecase$ethnicitygroup, ref = "White")
 ```
 
 
@@ -1856,10 +1533,13 @@ complete_case_pds_analysis<-completecase %>%
 
 
 complete_case_pds_analysis$BMI2<- relevel(complete_case_pds_analysis$BMI2,ref = "[18.5,25)")
+complete_case_pds_analysis$`Commissioning region`<-as.factor(complete_case_pds_analysis$`Commissioning region`)
+complete_case_pds_analysis$`Commissioning region`<- relevel(complete_case_pds_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
+
 
 
 survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1877,10 +1557,10 @@ Check results are similar in complete-case analysis without including PS in the 
 
 ```{r}
 coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
-#adjuvantbreakcategory [43,181), HR 1.0045   LCI- 0.8357, HCI -  1.2073)
+#adjuvantbreakcategory [43,181), HR 1.0405   LCI- 0.89, HCI -  1.21)
 ```
 
 Complete-case analysis Cox regression: 5 year OS for IDS only
@@ -1889,9 +1569,11 @@ complete_case_ids_analysis<-completecase %>%
   filter(modality=="IDS")
 
 complete_case_ids_analysis$BMI2<- relevel(complete_case_ids_analysis$BMI2,ref = "[18.5,25)")
-
+complete_case_ids_analysis$`Commissioning region`<-as.factor(complete_case_ids_analysis$`Commissioning region`)
+complete_case_ids_analysis$`Commissioning region`<- relevel(complete_case_ids_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
  
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=complete_case_ids_analysis)
+survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1906,7 +1588,7 @@ coxtable_IDS_only%>%
 Check results are consistent in complete-case without PS:
 ```{r}
 check_IDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=complete_case_ids_analysis)
+  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_ids_analysis)
 summary(check_IDS)
 
 
@@ -1919,7 +1601,7 @@ summary(check_IDS)
 Check results are consistent in complete-case without PS:
 ```{r}
 check_PDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ETHNICITYCATEGORY+IMD2015_1,data=complete_case_pds_analysis)
+  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
 
   tbl_regression(check_PDS, exponentiate = TRUE) %>% 
   as_gt() %>% 
@@ -1964,9 +1646,5 @@ ggplot(graphs, aes(y=IMD2015_1,x=adjuvantbreak, fill =IMD2015_1 ))+geom_boxplot(
 
 ggplot(graphs, aes(y=modality,x=adjuvantbreak, fill =modality ))+geom_boxplot(show.legend = FALSE)+scale_fill_brewer(palette="Dark2")+theme_minimal()+xlab("Time to adjuvant chemotherapy (days)")+ylab(" ")
 ```
-Calculate whether patients had any unplanned admissions after surgery, stratify by demographics
 
-```{r}
-all_hes_data %>% 
-```
 
