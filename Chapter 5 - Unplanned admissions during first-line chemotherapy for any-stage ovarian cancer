@@ -361,9 +361,28 @@ regimens<-ovariansurgerycohort %>%
   fill(paclitaxelflag,.direction="updown") %>% 
   mutate(regimen=ifelse(carboflag==1&paclitaxelflag==1,"Carboplatin / paclitaxel doublet chemotherapy",NA)) %>% 
   mutate(regimen=ifelse(carboflag==1&is.na(paclitaxelflag),"Carboplatin singlet chemotherapy",regimen)) %>% 
+  filter(!is.na(regimen)) %>% #Exclude patients who  only received paclitaxel
   ungroup() %>% 
+    
+    select(PSEUDO_PAT, regimen) %>% 
   distinct(PSEUDO_PAT,.keep_all=T)
+  
+  regimens %>% 
+    count(PSEUDO_PAT)#n=14671
 ```
+N=14730 before
+Exclusion: remove patients who only received paclitaxel:
+N=14671 after
+N=59 excluded
+```{r}
+ovariansurgerycohort<-ovariansurgerycohort %>% 
+  merge(regimens, by ="PSEUDO_PAT")
+
+ovariansurgerycohort %>% 
+  count(PSEUDO_PAT) #n=14,671 all patients retained
+
+```
+
 
 Save the data table for further analysis:
 ```{r}
@@ -373,7 +392,7 @@ ovariansurgerycohort %>%
 
 ovariansurgerycohort %>% 
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=14,730 all patients retained
+  count(PSEUDO_PAT) #n=14,671 all patients retained
 ```
 
 Final check representation of the specified study cohort in HES records after exclusion criteria have been applied. This is to ensure all unplanned admissions are captured
@@ -647,7 +666,7 @@ cohort_with_admission2 %>%
 # Length:4326       Min.   : 0.00   
 # Class :character   1st Qu.:16.00   
 # Mode  :character   Median :22.00   - median time to admission from index date,n=4585
-#                    Mean   :20.94   
+#                    Mean   :20.95   
 #                    3rd Qu.:27.00   
 #                    Max.   :30.00
 ```
@@ -743,6 +762,7 @@ summarydata<-cohort_with_admission2 %>%
 ```
 
 
+
 Data cleaning of variables for multivariable logistic regression:
 ```{r}
 #Define the outcome of 30 day admission
@@ -785,11 +805,7 @@ regression_data$BMI2<-cut(regression_data$BMI, breaks=c(0,18.5,25,30,40,99), rig
 regimens<-regimens %>% 
   select(PSEUDO_PAT, regimen)
 
-regression_data<-regression_data %>% 
-  merge(regimens, by ="PSEUDO_PAT")
 
-regression_data %>% 
-  count(PSEUDO_PAT) #n=14,730 all patients retained
 ```
 
 
@@ -947,16 +963,38 @@ regression_table %>%
   gt::gtsave("oddsratios_firstlinechemo.docx")
 ```
 
-Try other models using interaction terms between demographic factors.
+Outcome 2b: Try other models using interaction terms between ethnicity and IMD
 ```{r}
 #Run other models using interaction terms
-model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+IMD2015_1+`Commissioning region`+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+PS+BMI2+regimen+gra,data=regression_data2,family="binomial")
+model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS+BMI2+regimen+GRADE,data=regression_data2,family="binomial")
 #Summarise logistic regression
 summary(model_interaction_age_surgery)
 
 #Create summary table of odds ratios using exponentiated coefficients from glm above.
-regression_table<-tbl_regression(model_interaction_age_surgery, exponentiate = TRUE)
+regression_table_2<-tbl_regression(model_interaction_age_surgery, exponentiate = TRUE)
+
+regression_table_2 %>% 
+  as_gt() %>% 
+  gt::gtsave("oddsratios_firstlinechemo_ethnicityIMDinteractionterm.docx")
 ```
+Outcome 2c: Alternative model using region*ethnicity interaction term
+```{r}
+#Create logistic regression model 
+model_interaction_region_ethnicity<-glm(admission_within_30_days~surgery+IMD2015_1+(REGION*ETHNICITY2)+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+GRADE+PS+BMI2+regimen,data=regression_data2,family="binomial")
+
+#Summarise logistic regression
+summary(model_interaction_region_ethnicity)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+regression_table3<-tbl_regression(model_interaction_region_ethnicity, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+regression_table3 %>% 
+  as_gt() %>% 
+  gt::gtsave("oddsratios_firstlinechemo_regionIMDinteractionterm.docx")
+```
+
+
 
 Data cleaning for summary tables:
 ```{r}
@@ -992,22 +1030,18 @@ cohort_with_admission2<-cohort_grade %>%
 Create summary tables which compare rate of unplanned admission by demographic factors.
 
 ```{r}
-summary_data<-cohort_with_admission2 %>% 
-  rename(surgery=surgery.x)
 
+regression_data2<-regression_data2 %>% 
+  mutate(PS=as.numeric(PS))
+regression_data2$PS2<-cut(regression_data2$PS, breaks=c(0,1,2,10), right = FALSE)
 
-summary_data %>% 
-distinct(PSEUDO_PAT,.keep_all=T) %>% 
+regression_data2%>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-   mutate(AGE=as.numeric(AGE)) %>%
-     mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "White"),"White",NA)) %>% 
-   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Asian|Black"),"Asian/Black",ETHNICITY2)) %>% 
-   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
-    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
   tbl_summary(by="admission_within_30_days") %>% 
   add_overall() %>% 
   add_ci() %>% 
@@ -1015,7 +1049,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   as_gt() %>% 
   gt::gtsave("baseline_table_study1.docx")
 
-summary_data %>% 
+regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
    mutate(AGE=as.numeric(AGE)) %>%
@@ -1025,7 +1059,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
    tbl_summary(by="IMD2015_1") %>% 
    add_overall() %>% 
   add_ci() %>% 
@@ -1033,7 +1067,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   as_gt() %>% 
   gt::gtsave("baseline_table_study1_IMD.docx")
 
-summary_data %>% 
+regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
    mutate(BMI=as.numeric(BMI)) %>% 
    mutate(AGE=as.numeric(AGE)) %>%
@@ -1043,7 +1077,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
   tbl_summary(by="ethnicitygroup") %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1053,7 +1087,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   gt::gtsave("baseline_table_study1_ETHNICITY.docx")
 
 
-summary_data %>% 
+regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
    mutate(BMI=as.numeric(BMI)) %>% 
    mutate(AGE=as.numeric(AGE)) %>%
@@ -1063,7 +1097,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
    tbl_summary(by="ETHNICITY2") %>% 
    add_overall() %>% 
     add_ci() %>% 
@@ -1073,7 +1107,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   gt::gtsave("baseline_table_study1_ETHNICITY.docx")
 
 
-summary_data %>% 
+regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
    mutate(AGE=as.numeric(AGE)) %>%
@@ -1083,7 +1117,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>% 
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
   tbl_summary(by="AGE2") %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1092,7 +1126,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   as_gt() %>% 
   gt::gtsave("baseline_table_study1_AGE2.docx")
 
-summary_data %>% 
+regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
    mutate(AGE=as.numeric(AGE)) %>%
@@ -1102,7 +1136,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Other|Unknown|Mixed"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-    select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
   tbl_summary(by="Commissioning region") %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1126,7 +1160,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
 
-    select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,SITE_ICD10_O2,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,`Commissioning region`,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
   tbl_summary(by="year_of_treatment") %>% 
   add_overall() %>% 
   add_ci() %>% 
