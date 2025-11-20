@@ -63,8 +63,20 @@ ICD10_codes<-read_csv(
  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ICD10_codes.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
-  col_select = NULL) 
+  col_select = NULL)
+```
 
+Check representation of the specified study cohort in HES records.
+```{r}
+HESAPC %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(cohort,by="PSEUDO_PAT") %>% ##n=23,298 of 23,744 have a record in HES APC (98.1%)
+  count(PSEUDO_PAT)
+
+HES_chemo %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(cohort,by="PSEUDO_PAT") %>% ##n=23,055 of 23,744 have a record in HES APC (97.1%)
+  count(PSEUDO_PAT)
 ```
 
 Initial check of data cleaning:
@@ -140,6 +152,19 @@ cohort <-cohort %>%
 
 cohort %>% 
   count(PSEUDO_PAT) #n=17,804 who received carboplatin/paclitaxel/bevacizumab or PARP inhibitor
+```
+
+Check representation of the specified study cohort in HES records after exclusion criteria have been applied.
+```{r}
+HESAPC %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(cohort,by="PSEUDO_PAT") %>% ##n=17,585 of 17,804 have a record in HES APC (98.8%)
+  count(PSEUDO_PAT)
+
+HES_chemo %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(cohort,by="PSEUDO_PAT") %>% ##n=17,277 of 17,804 have a record in HES APC (97.0%)
+  count(PSEUDO_PAT)
 ```
 
 ################
@@ -349,6 +374,19 @@ ovariansurgerycohort %>%
 ovariansurgerycohort %>% 
   ungroup() %>% 
   count(PSEUDO_PAT) #n=14,730 all patients retained
+```
+
+Final check representation of the specified study cohort in HES records after exclusion criteria have been applied. This is to ensure all unplanned admissions are captured
+```{r}
+HESAPC %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(ovariansurgerycohort,by="PSEUDO_PAT") %>% ##n=14,551 of 14,703 have a record in HES APC (99.0%)
+  count(PSEUDO_PAT)
+
+HES_chemo %>% 
+  distinct(PSEUDO_PAT) %>% 
+  merge(ovariansurgerycohort,by="PSEUDO_PAT") %>% ##n=14,283 of 14,703 have a record in HES APC (97.1%)
+  count(PSEUDO_PAT)
 ```
 
 ###########################################################################
