@@ -1701,13 +1701,27 @@ dataset %>%
 Descriptives of the linked dataset:
 ```{r}
 library(gtsummary)
+dataset<-dataset %>% 
+mutate(AGE=as.numeric(AGE))
+
+dataset$AGE2 <-cut(dataset$AGE, breaks=c(0,50,60,70,150), right = FALSE)
+     
+dataset<-dataset %>% 
+  mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "ASIAN|BLACK"),"Asian/Black",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED"),"Mixed Race/Other/Unknown",ETHNICITY2)) 
+        
+dataset<-dataset %>% 
+mutate(BMI=as.numeric(BMI))
+        
+dataset$BMI2<-cut(dataset$BMI, breaks=c(0,18.5,25,30,40,99), right = FALSE)
+
 SUMMARYTABLE<-dataset %>% 
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  mutate(AGE=as.numeric(AGE)) %>% 
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
-  mutate(BMI=as.numeric(BMI)) %>% 
-  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI, PS, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE) %>% 
+  select(AGE,AGE2, ethnicitygroup, ETHNICITY2, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI,BMI2, PS, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n()
 
