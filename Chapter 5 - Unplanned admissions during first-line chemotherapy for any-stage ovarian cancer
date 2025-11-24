@@ -949,7 +949,7 @@ STAGE_IMD %>%
 Outcome 2: Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
 ```{r}
 #Create logistic regression model 
-model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
+model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
 summary(model)
@@ -966,7 +966,7 @@ regression_table %>%
 Outcome 2b: Try other models using interaction terms between ethnicity and IMD
 ```{r}
 #Run other models using interaction terms
-model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS+BMI2+regimen+GRADE+year_of_treatment,data=regression_data2,family="binomial")
+model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS2+BMI2+regimen+GRADE+year_of_treatment,data=regression_data2,family="binomial")
 #Summarise logistic regression
 summary(model_interaction_age_surgery)
 
@@ -980,7 +980,7 @@ regression_table_2 %>%
 Outcome 2c: Alternative model using region*ethnicity interaction term
 ```{r}
 #Create logistic regression model 
-model_interaction_region_ethnicity<-glm(admission_within_30_days~surgery+IMD2015_1+(REGION*ETHNICITY2)+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+GRADE+PS+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
+model_interaction_region_ethnicity<-glm(admission_within_30_days~surgery+IMD2015_1+(REGION*ETHNICITY2)+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
 summary(model_interaction_region_ethnicity)
