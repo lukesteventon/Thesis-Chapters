@@ -1396,7 +1396,7 @@ cohortsurvival %>%
   ungroup() %>% 
   skimr::skim()
 
-survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
+survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
 summary(survival)
 
 coxtable<-tbl_regression(survival, exponentiate = TRUE)%>% 
@@ -1409,7 +1409,7 @@ coxtable %>%
 
 Cox regression for adjuvant time as a continuous variable:
 ```{r}
-survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN,data=cohortsurvival)
+survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
 summary(survival2)
 
 coxtable2<-tbl_regression(survival2, exponentiate = TRUE)%>% 
@@ -1485,7 +1485,7 @@ kmcurveplot_IDS
 Cut PS into 0,1,>1 for Cox
 Cox regression: 5 year OS for PDS only
 ```{r}
-survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITY2+IMD2015_1,data=pds_analysis)
+survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITY2+IMD2015_1+PS,data=pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1503,7 +1503,7 @@ coxtable_PDS_only%>%
 
 Cox regression: 5 year OS for IDS only
 ```{r}
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=ids_analysis)
+survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1539,7 +1539,7 @@ complete_case_pds_analysis$`Commissioning region`<- relevel(complete_case_pds_an
 
 
 survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1557,7 +1557,7 @@ Check results are similar in complete-case analysis without including PS in the 
 
 ```{r}
 coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 #adjuvantbreakcategory [43,181), HR 1.0405   LCI- 0.89, HCI -  1.21)
@@ -1573,7 +1573,7 @@ complete_case_ids_analysis$`Commissioning region`<-as.factor(complete_case_ids_a
 complete_case_ids_analysis$`Commissioning region`<- relevel(complete_case_ids_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
  
 survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_ids_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1588,7 +1588,7 @@ coxtable_IDS_only%>%
 Check results are consistent in complete-case without PS:
 ```{r}
 check_IDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_ids_analysis)
+  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_ids_analysis)
 summary(check_IDS)
 
 
