@@ -1051,7 +1051,7 @@ regression_data2%>%
   mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
   mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,year_of_treatment,regimen) %>%
   tbl_summary(by="admission_within_30_days") %>% 
   add_overall() %>% 
   add_ci() %>% 
