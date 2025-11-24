@@ -956,7 +956,7 @@ STAGE_IMD %>%
  write_csv("STAGE_IMD_interaction_terms.csv")
 ```
 
-Outcome 2: Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
+Outcome 2a: Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
 ```{r}
 #Create logistic regression model 
 model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
@@ -972,8 +972,26 @@ regression_table %>%
   as_gt() %>% 
   gt::gtsave("oddsratios_firstlinechemo.docx")
 ```
+Outcome 2b: Run glm with ethnicity as white/non-white to check robustness of grouping these patients.
+```{r}
+#Create logistic regression model 
+model2<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
 
-Outcome 2b: Try other models using interaction terms between ethnicity and IMD
+#Summarise logistic regression
+summary(model2)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+regression_table2<-tbl_regression(model2, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+regression_table %>% 
+  as_gt() %>% 
+  gt::gtsave("oddsratios_firstlinechemo.docx")
+```
+
+
+
+Outcome 2c: Try other models using interaction terms between ethnicity and IMD
 ```{r}
 #Run other models using interaction terms
 model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS2+BMI2+regimen+GRADE+year_of_treatment,data=regression_data2,family="binomial")
