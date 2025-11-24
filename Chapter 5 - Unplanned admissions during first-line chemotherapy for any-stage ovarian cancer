@@ -846,6 +846,11 @@ imd_univariate<-tidy(imd, exponentiate = TRUE, conf.int = TRUE)
 imd_univariate %>% 
 write_csv("imd_univariate.csv")
 
+grade<-lm(admission_within_30_days~GRADE,data=regression_data2,family="binomial")
+grade_univariate<-tidy(grade, exponentiate = TRUE, conf.int = TRUE)
+grade_univariate %>% 
+write_csv("grade_univariate.csv")
+
 regression_data2$REGION<-as.factor(regression_data2$REGION)
 regression_data2$REGION<-relevel(regression_data2$REGION, ref = "LONDON COMMISSIONING REGION")
 region<-lm(admission_within_30_days~REGION,data=regression_data2,family="binomial")
