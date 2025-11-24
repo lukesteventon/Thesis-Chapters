@@ -800,7 +800,7 @@ regression_data<-regression_data %>%
 
 regression_data<-regression_data %>% 
   mutate(PS=as.numeric(PS))
-regression_data$PS<-cut(regression_data$PS, breaks=c(0,1,2,10), right = FALSE)
+regression_data$PS2<-cut(regression_data$PS, breaks=c(0,1,2,10), right = FALSE)
 regression_data$BMI2<-cut(regression_data$BMI, breaks=c(0,18.5,25,30,40,99), right = FALSE)
 regimens<-regimens %>% 
   select(PSEUDO_PAT, regimen)
