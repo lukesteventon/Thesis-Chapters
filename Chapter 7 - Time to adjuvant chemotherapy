@@ -1144,6 +1144,27 @@ cohort %>%
   skimr::skim() #PS 91.95% complete
 ```
 
+Create table one by surgical status. This includes imputed data.
+```{r}
+tabledata<-cohort
+
+tabledata<-tabledata %>% 
+ select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+  mutate(adjuvantbreak=as.numeric(adjuvantbreak)) %>% 
+  mutate(AGE=as.numeric(AGE))
+
+tabledata<-tabledata%>% 
+  select(-PSEUDO_PAT) %>% 
+  tbl_summary(by="modality",missing_text="(Missing)") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+tabledata%>%
+  as_gt() %>% 
+  gt::gtsave("tableone_before_imputation.docx")
+```
+
 MICE: Select variables for multiple imputation. This is to impute the BMI and PS values for patients with missing height and weight data, to incorprate into survival analysis. 
 MICE must include the outcome as part of the imputation model.
 PS is now part of this model as per David's suggestion:
@@ -1262,7 +1283,7 @@ cohort3<-cohort2 %>%
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED|NOT STATED|NOT KNOWN|Unknown"),"Mixed Race/Other/Unknown",ETHNICITY2))
 ```
 
-Create table one by surgical status:
+Create table one by surgical status. This includes imputed data.
 ```{r}
 cohort<-cohort3
 
@@ -1284,7 +1305,7 @@ tableone<-cohort%>%
 
 tableone%>%
   as_gt() %>% 
-  gt::gtsave("tableone.docx")
+  gt::gtsave("tableone_after_imputation.docx")
 ```
 
 
@@ -1396,7 +1417,7 @@ cohortsurvival %>%
   ungroup() %>% 
   skimr::skim()
 
-survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
+survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS2,data=cohortsurvival)
 summary(survival)
 
 coxtable<-tbl_regression(survival, exponentiate = TRUE)%>% 
@@ -1409,7 +1430,7 @@ coxtable %>%
 
 Cox regression for adjuvant time as a continuous variable:
 ```{r}
-survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
+survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS2,data=cohortsurvival)
 summary(survival2)
 
 coxtable2<-tbl_regression(survival2, exponentiate = TRUE)%>% 
@@ -1482,10 +1503,9 @@ kmcurveplot_IDS<-ggsurvplot(kmcurveIDS,
             legend.labs=c("<=6 weeks","6< weeks"))
 kmcurveplot_IDS
 ```
-Cut PS into 0,1,>1 for Cox
 Cox regression: 5 year OS for PDS only
 ```{r}
-survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITY2+IMD2015_1+PS,data=pds_analysis)
+survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ETHNICITY2+IMD2015_1+PS2,data=pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1503,7 +1523,7 @@ coxtable_PDS_only%>%
 
 Cox regression: 5 year OS for IDS only
 ```{r}
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=ids_analysis)
+survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1539,7 +1559,7 @@ complete_case_pds_analysis$`Commissioning region`<- relevel(complete_case_pds_an
 
 
 survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1557,7 +1577,7 @@ Check results are similar in complete-case analysis without including PS in the 
 
 ```{r}
 coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 #adjuvantbreakcategory [43,181), HR 1.0405   LCI- 0.89, HCI -  1.21)
@@ -1573,7 +1593,7 @@ complete_case_ids_analysis$`Commissioning region`<-as.factor(complete_case_ids_a
 complete_case_ids_analysis$`Commissioning region`<- relevel(complete_case_ids_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
  
 survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_ids_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_ids_analysis)
 summary(survival_IDS)
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
@@ -1588,7 +1608,7 @@ coxtable_IDS_only%>%
 Check results are consistent in complete-case without PS:
 ```{r}
 check_IDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=complete_case_ids_analysis)
+  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_ids_analysis)
 summary(check_IDS)
 
 
