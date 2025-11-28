@@ -1467,7 +1467,7 @@ kmcurveplot_PDS<-ggsurvplot(kmcurvePDS,
            risk.table.height=0.3,
            risk.table.y.text.col=T,
            risk.table.y.text=T,
-           ncensor.plot=TRUE,srv.median.line="hv",
+           ncensor.plot=TRUE,surv.median.line="hv",
            legend.labs=c("<=6 weeks","6< weeks"))
 
 kmcurveplot_PDS
@@ -1499,7 +1499,7 @@ kmcurveplot_IDS<-ggsurvplot(kmcurveIDS,
            risk.table.height=0.3,
            risk.table.y.text.col=T,
            risk.table.y.text=T,
-           ncensor.plot=TRUE,srv.median.line="hv",
+           ncensor.plot=TRUE,surv.median.line="hv",
             legend.labs=c("<=6 weeks","6< weeks"))
 kmcurveplot_IDS
 ```
