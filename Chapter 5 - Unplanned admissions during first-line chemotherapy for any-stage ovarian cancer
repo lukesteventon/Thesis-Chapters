@@ -772,8 +772,8 @@ regression_data<-cohort_with_admission2 %>%
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "ASIAN|BLACK"),"Asian/Black",ETHNICITY2)) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED"),"Mixed Race/Other/Unknown",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "MIXED|OTHER"),"Mixed Race/Other",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Unknown|UNKNOWN|NOT|Not"),"Unknown",ETHNICITY2)) %>% 
   mutate(AGE=as.numeric(AGE)) %>% 
   mutate(BMI=as.numeric(BMI))
 
