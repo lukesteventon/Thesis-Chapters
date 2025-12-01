@@ -865,6 +865,11 @@ datasetclean %>%
   select(STAGE_BEST, FIGO_) %>% 
   skimr::skim() #stage_BEST 5.7 complete, FIGO 64.3% complete
 
+datasetclean%>%  
+  count(STAGE_BEST) %>%  
+write_csv("stage_before_cleaning.csv")
+
+
 #Clean staging data to unify terms into common groups:
 datasetclean<-datasetclean %>%
           mutate(STAGE_BEST_CLEAN=ifelse(STAGE_BEST=="1","1", NA)) %>% 
@@ -931,6 +936,10 @@ datasetclean<-datasetclean%>%
 datasetclean %>% 
 count(STAGE_BEST_CLEAN)
 
+datasetclean%>%  
+  count(STAGE_BEST) %>%  
+write_csv("stage_after_cleaning.csv")
+
 datasetclean %>% 
     count(FIGO__CLEAN)
 
@@ -948,10 +957,13 @@ datasetclean %>%
 
 5v): Cleaning of ethnicity terms. Terms are grouped according to broad UK census terminology to allow for comparison between groups in planned studies.
 ```{r}
-datasetclean %>% 
+ethnicitycount<-datasetclean %>% 
   select(ETHNICITYNAME) %>% 
   skimr::skim()
-  
+
+ethnicitycount%>% 
+write_csv("ethnicity_before_cleaning.csv")
+
   datasetclean %>% 
 mutate(ETHNICITYNAME = recode(ETHNICITYNAME,
                                 'ANY OTHER ASIAN BACKGROUND' = "Asian",
@@ -983,6 +995,9 @@ datasetclean<-datasetclean %>%
 datasetclean %>% 
   select(ETHNICITYNAME) %>% 
   skimr::skim() #100% complete
+
+datasetclean %>% 
+write_csv("ethnicity_after_cleaning.csv")
 ```
 
 5vi): Cleaning of VITALSTATUS. This is the variable allowing for overall survival analysis.
@@ -990,6 +1005,10 @@ datasetclean %>%
 #Before data cleaning
 datasetclean %>%  
   count(VITALSTATUS) #0.43% marked as X - unknown
+
+datasetclean%>%  
+  count(VITALSTATUS) %>%  
+write_csv("vitalstatus_before_cleaning.csv")
 
 datasetclean<-datasetclean %>%  
   mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"X"),"UNK", VITALSTATUS)) %>% 
@@ -999,6 +1018,10 @@ datasetclean<-datasetclean %>%
 #After data cleaning
 datasetclean %>% 
   count(VITALSTATUS)
+
+datasetclean%>%  
+  count(VITALSTATUS) %>%  
+write_csv("vitalstatus_before_cleaning.csv")
 ```
 
 5vii:) Overall assessment of data completeness:
