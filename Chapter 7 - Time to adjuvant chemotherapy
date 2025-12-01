@@ -1279,8 +1279,8 @@ Recode ethnicity for analysis:
 cohort3<-cohort2 %>% 
  mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "ASIAN|BLACK|CHINESE"),"Asian/Black",ETHNICITY2)) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED|NOT STATED|NOT KNOWN|Unknown"),"Mixed Race/Other/Unknown",ETHNICITY2))
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "MIXED|OTHER"),"Mixed Race/Other",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Unknown|UNKNOWN|NOT|Not"),"Unknown",ETHNICITY2)) 
 ```
 
 Create table one by surgical status. This includes imputed data.
