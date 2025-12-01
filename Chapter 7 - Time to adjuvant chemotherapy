@@ -671,8 +671,11 @@ ovariansurgerycohort$modality<-as.factor(ovariansurgerycohort$modality)
 ovariansurgerycohort$modality<- relevel(ovariansurgerycohort$modality, ref = "PDS")
 ovariansurgerycohort$ETHNICITYNAME<-as.factor(ovariansurgerycohort$ETHNICITYNAME)
 ovariansurgerycohort<- ovariansurgerycohort %>% 
-  mutate(ETHNICITYCATEGORY=ifelse(ETHNICITYNAME=="WHITE","White", "Non-white"))
+  mutate(ETHNICITYCATEGORY=ifelse(ETHNICITYNAME=="WHITE","White", "Non-white")) %>% 
+  mutate(ETHNICITYCATEGORY=ifelse(ETHNICITYNAME=="UNKNOWN|NOT","Unknown", ETHNICITYCATEGORY)) 
 ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "WHITE BRITISH")
+ovariansurgerycohort$ETHNICITYCATEGORY<-as.factor(ovariansurgerycohort$ETHNICITYCATEGORY)
+ovariansurgerycohort$ETHNICITYCATEGORY<- relevel(ovariansurgerycohort$ETHNICITYCATEGORY, ref = "White")
 ```
 
 
