@@ -1280,7 +1280,8 @@ skimr_PS_by_site %>%
 Recode ethnicity for analysis:
 ```{r}
 cohort3<-cohort2 %>% 
- mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
+  mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
+  mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"UNKNOWN|NOT"),"Unknown",ethnicitygroup)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "MIXED|OTHER"),"Mixed Race/Other",ETHNICITY2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Unknown|UNKNOWN|NOT|Not"),"Unknown",ETHNICITY2)) 
