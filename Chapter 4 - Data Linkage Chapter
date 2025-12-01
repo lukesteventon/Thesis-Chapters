@@ -1733,7 +1733,8 @@ dataset<-dataset %>%
   mutate(ethnicitygroup=ifelse(str_detect(ETHNICITYNAME,"WHITE"),"White","Non-white")) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "WHITE"),"White",NA)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "ASIAN|BLACK"),"Asian/Black",ETHNICITY2)) %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "OTHER|UNKNOWN|MIXED"),"Mixed Race/Other/Unknown",ETHNICITY2)) 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "MIXED|OTHER"),"Mixed Race/Other",ETHNICITY2)) %>% 
+  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Unknown|UNKNOWN|NOT|Not"),"Unknown",ETHNICITY2)) 
         
 dataset<-dataset %>% 
 mutate(BMI=as.numeric(BMI))
