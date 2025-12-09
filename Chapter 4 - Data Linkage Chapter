@@ -1780,9 +1780,12 @@ Plot treatment dates in the SACT dataset:
 admin_dates<-dataset %>% 
   select(ADMINISTRATION_DATE) 
 
+admin_dates$admin_date_my<-
+  format(as.Date(admin_dates$ADMINISTRATION_DATE),  "%Y")
+
 admin_dates$admin_date<-format(as.Date(admin_dates$ADMINISTRATION_DATE),  "%Y")
 
-admin_plot<-ggplot(data=admin_dates, aes(x=admin_date))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment dates", bins =4)+theme(plot.title=element_text(hjust=0.5))+xlab("")+ylab("Number of treatments")+ theme(axis.text.x=element_text(angle=90))
+admin_plot<-ggplot(data=admin_dates, aes(x=admin_date))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment dates", bins =5)+theme(plot.title=element_text(hjust=0.5))+xlab("")+ylab("Number of treatments")+ theme(axis.text.x=element_text(angle=90))
 
 #Write plot of follow up dates
 ggsave("treatment_dates.png",plot=admin_plot)
