@@ -832,6 +832,40 @@ datasetclean<-datasetclean %>%
 datasetclean #476,911 rows. Duplicated rows removed
 ```
 
+Exclusion: Remove patients who did not receive SACT for ovarian cancer:
+This excludes patients who had an ovarian cancer diagnosis but have no corresponding SACT regimen
+```{r}
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=25,176
+
+datasetclean<-datasetclean %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(diagnosis=ifelse(str_detect(SITE_ICD10_O2,"C56|C57|C48"),1,NA)) %>% 
+  fill(diagnosis,.direction="updown") %>% 
+  filter(diagnosis==1) %>% 
+  select(-diagnosis) %>% 
+  ungroup()
+
+datasetclean %>% 
+  count(PSEUDO_PAT) #n=23,774
+```
+
+Write csv:
+```{r}
+datasetclean %>% 
+  write_csv("dataset9DEC25.csv")
+```
+
+Read csv:
+```{r}
+datasetclean<-read_csv(
+  "dataset9DEC25.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+```
+
+
 5iii):
 Calculate BMI:
 ```{r}
@@ -841,6 +875,16 @@ datasetclean<-datasetclean %>%
   group_by(PSEUDO_PAT) %>% 
   mutate(BMI=WEIGHT_AT_START_OF_REGIMEN/(HEIGHT_AT_START_OF_REGIMEN^2)) %>% 
   ungroup() 
+
+#Create histogram for BMI values before data cleaning and save distribution
+datasetclean %>% 
+  select(BMI) %>% 
+  skimr::skim()%>%  
+write_csv("bmi_before_cleaning.csv")
+
+bmi_before_cleaning_hist<-gghistogram(datasetclean$BMI, y="count", ylab="n", xlim=c(0,75), fill="darkgreen", xlab="Body mass index", bins =40, title = "Body mass index distribution (before data cleaning)")+theme(plot.title=element_text(hjust=0.5))
+
+ggsave("bmi_before_cleaning.png",plot=bmi_before_cleaning_hist)
 
 #Clean BMI if height or weight are clearly erroneous
 datasetclean<-datasetclean %>% 
@@ -855,7 +899,19 @@ datasetclean<-datasetclean %>%
 datasetclean %>% 
   select(BMI) %>% 
   skimr::skim() #BMI 96.17% complete
+
+datasetclean %>% 
+  select(BMI) %>% 
+  skimr::skim()%>%  
+write_csv("bmi_after_cleaning.csv")
+
+#Create histogram for BMI values after data cleaning and save distribution
+bmi_clean_hist<-gghistogram(datasetclean$BMI, y="count", ylab="n", xlim=c(0,75), fill="darkgreen", xlab="Body mass index", bins =40, title = "Body mass index distribution (after data cleaning)")+theme(plot.title=element_text(hjust=0.5))
+
+ggsave("bmi_after_cleaning.png",plot=bmi_clean_hist)
+
 ```
+
 
 5iv): Data cleaning:
 STAGE_BEST and FIGO columns were clean to standardised criteria. Ovarian cancer staging is done according to FIGO, therefore if STAGE_BEST was missing, FIGO values were used to fill STAGE_BEST to achieve maximal completeness.
@@ -863,11 +919,23 @@ STAGE_BEST and FIGO columns were clean to standardised criteria. Ovarian cancer 
 #Completeness of stage before data cleaning
 datasetclean %>%
   select(STAGE_BEST, FIGO_) %>% 
-  skimr::skim() #stage_BEST 5.7 complete, FIGO 64.3% complete
+  skimr::skim() #stage_BEST 95.9 complete, FIGO 64.3% complete
 
 datasetclean%>%  
-  count(STAGE_BEST) %>%  
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(STAGE_BEST)%>%  
+  mutate(sum=sum(n)) %>%  
 write_csv("stage_before_cleaning.csv")
+
+#Plot stage before cleaning
+stage_hist_data<-datasetclean %>% 
+  select(STAGE_BEST,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+stage_before_clean_hist<-ggplot(data=stage_hist_data, aes(x=STAGE_BEST))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Cancer stage distribution (before data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Cancer stage")+ theme(axis.text.x=element_text(angle=90))
+
+
+ggsave("stage_before_cleaning.png",plot=stage_before_clean_hist)
 
 
 #Clean staging data to unify terms into common groups:
@@ -937,7 +1005,9 @@ datasetclean %>%
 count(STAGE_BEST_CLEAN)
 
 datasetclean%>%  
-  count(STAGE_BEST) %>%  
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(STAGE_BEST_CLEAN) %>%  
+  mutate(sum=sum(n)) %>% 
 write_csv("stage_after_cleaning.csv")
 
 datasetclean %>% 
@@ -953,18 +1023,40 @@ datasetclean<-datasetclean %>%
 datasetclean %>%
   select(STAGE_BEST, FIGO_) %>% 
   skimr::skim() #stage_best 95.7% complete, FIGO 64.4% complete
+
+#Plot stage after cleaning
+stage_hist_data<-datasetclean %>% 
+  select(STAGE_BEST_CLEAN,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+stage_after_clean_hist<-ggplot(data=stage_hist_data, aes(x=STAGE_BEST_CLEAN))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Cancer stage distribution (after data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Cancer stage")+ theme(axis.text.x=element_text(angle=90))
+
+ggsave("stage_after_cleaning.png",plot=stage_after_clean_hist)
+
 ```
 
 5v): Cleaning of ethnicity terms. Terms are grouped according to broad UK census terminology to allow for comparison between groups in planned studies.
 ```{r}
 ethnicitycount<-datasetclean %>% 
-  select(ETHNICITYNAME) %>% 
+  select(PSEUDO_PAT,ETHNICITYNAME) %>% 
   skimr::skim()
 
-ethnicitycount%>% 
+#Plot ethnicity before cleaning
+ethnicity_hist_data<-datasetclean %>% 
+  select(ETHNICITYNAME,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+ethnicity_hist_data%>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(ETHNICITYNAME) %>%  
+  mutate(sum=sum(n)) %>% 
 write_csv("ethnicity_before_cleaning.csv")
 
-  datasetclean %>% 
+ethnicity_before_clean_hist<-ggplot(data=ethnicity_hist_data, aes(x=ETHNICITYNAME))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Ethnicity distribution (before data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Ethnicity")+ theme(axis.text.x=element_text(angle=90))
+
+ggsave("ethnicity_before_cleaning.png",plot=ethnicity_before_clean_hist)
+
+datasetclean<-datasetclean %>% 
 mutate(ETHNICITYNAME = recode(ETHNICITYNAME,
                                 'ANY OTHER ASIAN BACKGROUND' = "Asian",
                                 'ASIAN BANGLADESHI' = "Asian",
@@ -997,19 +1089,44 @@ datasetclean %>%
   skimr::skim() #100% complete
 
 datasetclean %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(ETHNICITYNAME) %>%  
+  mutate(sum=sum(n)) %>% 
 write_csv("ethnicity_after_cleaning.csv")
+
+#Plot ethnicity after cleaning
+ethnicity_hist_data<-datasetclean %>% 
+  select(ETHNICITYNAME,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+ethnicity_after_clean_hist<-ggplot(data=ethnicity_hist_data, aes(x=ETHNICITYNAME))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Ethnicity distribution (after data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Ethnicity")+ theme(axis.text.x=element_text(angle=90))
+
+ggsave("ethnicity_after_cleaning.png",plot=ethnicity_after_clean_hist)
 ```
 
 5vi): Cleaning of VITALSTATUS. This is the variable allowing for overall survival analysis.
 ```{r}
+gfdsgfdsgfds
 #Before data cleaning
 datasetclean %>%  
-  count(VITALSTATUS) #0.43% marked as X - unknown
+  count(VITALSTATUS) #0.414% marked as X - unknown
 
 datasetclean%>%  
-  count(VITALSTATUS) %>%  
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(VITALSTATUS) %>% 
+  mutate(sum=sum(n)) %>% 
 write_csv("vitalstatus_before_cleaning.csv")
 
+#Plot ethnicity before cleaning
+vitalstatus_hist_data<-datasetclean %>% 
+  select(VITALSTATUS,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+VITALSTATUS_clean_hist<-ggplot(data=vitalstatus_hist_data, aes(x=VITALSTATUS))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Follow-up status (before data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Follow-up status")+ theme(axis.text.x=element_text(angle=90))
+
+ggsave("vitalstatus_before_cleaning.png",plot=VITALSTATUS_clean_hist)
+
+#Recode vitalstatus to standardise terms
 datasetclean<-datasetclean %>%  
   mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"X"),"UNK", VITALSTATUS)) %>% 
   mutate(VITALSTATUS=ifelse(str_detect(VITALSTATUS,"D"),"D", VITALSTATUS)) %>% 
@@ -1020,8 +1137,36 @@ datasetclean %>%
   count(VITALSTATUS)
 
 datasetclean%>%  
-  count(VITALSTATUS) %>%  
-write_csv("vitalstatus_before_cleaning.csv")
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(VITALSTATUS) %>% 
+  mutate(sum=sum(n)) %>%   
+write_csv("vitalstatus_after_cleaning.csv")
+
+#Plot ethnicity before cleaning
+vitalstatus_hist_data<-datasetclean %>% 
+  select(VITALSTATUS,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+VITALSTATUS_after_clean_hist<-ggplot(data=vitalstatus_hist_data, aes(x=VITALSTATUS))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Follow-up status (before data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Follow-up status")+ theme(axis.text.x=element_text(angle=90))
+
+ggsave("vitalstatus_after_cleaning.png",plot=VITALSTATUS_after_clean_hist)
+
+#Plot dates of follow-up status
+followup_dates<-datasetclean %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(VITALSTATUSDATE) %>% 
+  mutate(VITALSTATUSDATE=floor_date(dmy(VITALSTATUSDATE), "month"))
+
+followup_dates$date<-format(as.Date(followup_dates$VITALSTATUSDATE),  "%Y")
+
+dates_plot<-ggplot(data=followup_dates, aes(x=date))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Follow-up status (after data cleaning)", bins =4)+theme(plot.title=element_text(hjust=0.5))+xlab("Year of last known follow-up")+ theme(axis.text.x=element_text(angle=90))
+
+#Write table of follow up dates
+followup_dates %>% 
+  write_csv("follow_up_dates.csv")
+
+#Write plot of follow up dates
+ggsave("follow_up_status_coverage.png",plot=dates_plot)
 ```
 
 5vii:) Overall assessment of data completeness:
@@ -1029,24 +1174,6 @@ write_csv("vitalstatus_before_cleaning.csv")
 datasetclean %>% 
 skimr::skim()
 ```
-Exclusion: Remove patients who did not receive SACT for ovarian cancer:
-This excludes patients who had an ovarian cancer diagnosis but have no corresponding SACT regimen
-```{r}
-datasetclean %>% 
-  count(PSEUDO_PAT) #n=25,176
-
-datasetclean<-datasetclean %>% 
-  group_by(PSEUDO_PAT) %>% 
-  mutate(diagnosis=ifelse(str_detect(SITE_ICD10_O2,"C56|C57|C48"),1,NA)) %>% 
-  fill(diagnosis,.direction="updown") %>% 
-  filter(diagnosis==1) %>% 
-  select(-diagnosis) %>% 
-  ungroup()
-
-datasetclean %>% 
-  count(PSEUDO_PAT) #n=23,774
-```
-
 
 
 4i): Save data
