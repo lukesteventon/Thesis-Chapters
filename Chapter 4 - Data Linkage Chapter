@@ -698,7 +698,7 @@ dataset  %>%
 At this point I made the decision to exclude patients with missing tumour IDs. This was a considered decision that balanced cohort size with data quality issues. Where ID is missing there is significant missing information (11% missing diagnosis, diagnosis date, age etc.) which has the potential to cause significant bias in the planned studies. I therefore believe that the choice to exclude patients with incomplete diagnostic data is valid and can justify this.
 ```{r}
 dataset %>% 
-  count(PSEUDO_PAT) #n=29927
+  count(PSEUDO_PAT) #n=29,927
 
 #Exclude this with missing diagnostic information from linkage
 excluded_patients<-dataset %>% 
@@ -710,6 +710,7 @@ excluded_patients<-dataset %>%
   mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
   ungroup()
 
+#Cut age into categories
 excluded_patients$AGE2 <-cut(excluded_patients$AGE, breaks=c(0,50,60,70,150), right = FALSE)
 
 
@@ -719,11 +720,13 @@ excluded_patients%>%
 #Write table for dataset before patients are excluded by missing TUMOURID
 library(gtsummary)
 
-
+#Amend age to numeric and cut into categories
 dataset2<-dataset %>% 
   mutate(AGE=as.numeric(AGE))
 dataset2$AGE2 <-cut(dataset2$AGE, breaks=c(0,50,60,70,150), right = FALSE)
 
+
+#Write table with characteristics of all patients linked from SACT to NCRAS
 dataset2 %>%
   mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>%
@@ -742,7 +745,7 @@ dataset2 %>%
   mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
   skimr::skim()
 
-#Write table for patients excluded due to TUMOURID
+#Write table with descriptives of excluded patients (excluded where missing PSEUDO_TUMOUR prevents linkage of SACT and diagnostic information)
 excluded_patients%>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   merge(deprivation_table,by="PSEUDO_PAT") %>% 
@@ -761,9 +764,9 @@ dataset%>%
   skimr::skim()
 ```
 
-
+Exclusion: patients with missing diagnostic information due to no matching TUMOURID were removed from the dataset. This was investigated thoroughly and the decision was made as the amount of missing data presents too much confounding for reliable use in studies
 ```{r}
-#Remove these patients from the dataset
+#Remove patients with missing diagnostic information from the dataset
 dataset<-dataset %>% 
   mutate(missingness=ifelse(is.na(DIAGNOSISDATEBEST),1,NA)) %>% 
   group_by(PSEUDO_PAT) %>% 
