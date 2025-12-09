@@ -100,6 +100,12 @@ treatment_table<-read_csv(
   
   col_types = cols(.default = col_character()),
   col_select = NULL)
+ 
+ trustcodes <- 
+  read_csv("trust_codes2.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
 ```
 
 1 - Link NCRAS patient to NCRAS tumour by PSEUDO_PAT. This is the  common identifier between the two datasets. As both datasets are collated by NCRAS, PSEUDO_PAT is a common ID that links patients information correctly.
@@ -700,35 +706,63 @@ excluded_patients<-dataset %>%
   group_by(PSEUDO_PAT) %>% 
   fill(missingness,.direction = "updown") %>% 
   filter(missingness==1) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
   ungroup()
+
+excluded_patients$AGE2 <-cut(excluded_patients$AGE, breaks=c(0,50,60,70,150), right = FALSE)
+
 
 excluded_patients%>% 
   count(PSEUDO_PAT) #n=4,751 patients with missing diagnostic information due to missing TUMOURID or otherwise missing fields
-#Write table for dataset before patients are exclued by missing TUMOURID
+
+#Write table for dataset before patients are excluded by missing TUMOURID
 library(gtsummary)
 
-dataset %>%
-distinct(PSEUDO_PAT,.keep_all=T) %>%
-  mutate(AGE=as.numeric(AGE)) %>% 
-  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,GRADE) %>% 
+
+dataset2<-dataset %>% 
+  mutate(AGE=as.numeric(AGE))
+dataset2$AGE2 <-cut(dataset2$AGE, breaks=c(0,50,60,70,150), right = FALSE)
+
+dataset2 %>%
+  mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>%
+  mutate(AGE=as.numeric(AGE)) %>%
+  merge(deprivation_table,by="PSEUDO_PAT") %>% 
+  rename(Code=ORGANISATION_CODE_OF_PROVIDER) %>% 
+  left_join(trustcodes, by = "Code") %>%
+  distinct(PSEUDO_PAT,.keep_all=T) %>%
+  select(AGE,AGE2, ETHNICITYNAME, SEX,DIAGNOSISDATEBEST,IMD2015_1,`Commissioning region`,DGH, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n() %>% 
   as_gt() %>% 
   gt::gtsave("characteristics_before_exclusion.docx")
 
-
+dataset2 %>%
+  mutate(DIAGNOSISDATEBEST=dmy(DIAGNOSISDATEBEST)) %>% 
+  skimr::skim()
 
 #Write table for patients excluded due to TUMOURID
 excluded_patients%>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-    mutate(AGE=as.numeric(AGE)) %>% 
-  select(AGE, ETHNICITYNAME, SEX, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
+  merge(deprivation_table,by="PSEUDO_PAT") %>% 
+  rename(Code=ORGANISATION_CODE_OF_PROVIDER) %>% 
+  left_join(trustcodes, by = "Code") %>%
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(AGE,AGE2, ETHNICITYNAME, SEX,DIAGNOSISDATEBEST,IMD2015_1,`Commissioning region`,DGH, VITALSTATUS,STAGE_BEST,SITE_ICD10_O2,GRADE) %>% 
   tbl_summary(by=NULL) %>% 
   add_n() %>% 
   as_gt() %>% 
   gt::gtsave("excluded_patient_characteristics.docx") #n=4,751
   
 
+dataset%>% 
+  select(DIAGNOSISDATEBEST,PSEUDO_PAT) %>% 
+  skimr::skim()
+```
+
+
+```{r}
 #Remove these patients from the dataset
 dataset<-dataset %>% 
   mutate(missingness=ifelse(is.na(DIAGNOSISDATEBEST),1,NA)) %>% 
@@ -1106,7 +1140,6 @@ ggsave("ethnicity_after_cleaning.png",plot=ethnicity_after_clean_hist)
 
 5vi): Cleaning of VITALSTATUS. This is the variable allowing for overall survival analysis.
 ```{r}
-gfdsgfdsgfds
 #Before data cleaning
 datasetclean %>%  
   count(VITALSTATUS) #0.414% marked as X - unknown
@@ -1147,7 +1180,7 @@ vitalstatus_hist_data<-datasetclean %>%
   select(VITALSTATUS,PSEUDO_PAT) %>% 
   distinct(PSEUDO_PAT,.keep_all=T)
 
-VITALSTATUS_after_clean_hist<-ggplot(data=vitalstatus_hist_data, aes(x=VITALSTATUS))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Follow-up status (before data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Follow-up status")+ theme(axis.text.x=element_text(angle=90))
+VITALSTATUS_after_clean_hist<-ggplot(data=vitalstatus_hist_data, aes(x=VITALSTATUS))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Follow-up status (after data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Follow-up status")+ theme(axis.text.x=element_text(angle=90))
 
 ggsave("vitalstatus_after_cleaning.png",plot=VITALSTATUS_after_clean_hist)
 
@@ -1514,7 +1547,7 @@ Firstly, import all HES APC and OP data and isolate the chemotherapy visits deno
 Write a file for the HES data to avoid importing again. This is a record chemotherapy appointments in  HES.
 ```{r}
 HES_DATA_COMPLETE <-  read_csv(
-  "HESdata_all_chemo.csv",
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio\\HESdata_all_chemo.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL)
@@ -1669,7 +1702,7 @@ PS_data<-rbind(cycle_new,cycle_old)
 PS_data %>%
   select(PS) %>% 
   skimr::skim()
-#PS 69.4% complete
+#PS 69.4% complete in the entire dataset
 
 PS_data<-PS_data %>% 
   group_by(PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
@@ -1687,6 +1720,20 @@ dataset %>%
   select(PS) %>% 
   skimr::skim()
 #PS 58.36 complete after linkage
+
+dataset %>% 
+  select(PS) %>% 
+  skimr::skim() %>% 
+  write_csv("PS_before_cleaning.csv")
+
+#Plot dates of performance status
+ps_hist<-dataset %>% 
+  select(PS)
+
+PS_plot<-ggplot(data=ps_hist, aes(x=PS))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Performance status (before data cleaning)", bins =4)+theme(plot.title=element_text(hjust=0.5))+xlab("Performance status")+ theme(axis.text.x=element_text(angle=90))
+
+#Write plot of follow up dates
+ggsave("ps_before_cleaning.png",plot=PS_plot)
 ```
 
 
@@ -1707,20 +1754,6 @@ dataset<-dataset %>%
 dataset %>% 
   skimr::skim()#Age 100% complete.
 
- dataset %>% 
-  filter(str_detect(SITE_ICD10_O2, "C56|C48|C57")) %>% 
-  count(PSEUDO_PAT)
-
-
- patient_table %>% 
-  filter(PSEUDO_PAT=="100019")
-
-tumour_table %>% 
-  filter(PSEUDO_PAT=="100019")
-
-dataset %>% 
-  filter(PSEUDO_PAT=="100019")
-
 all_sact %>% 
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% #two records of trastuzumab with different administration routes - these were removed when keeping one line per drug per date
   filter(PSEUDO_PAT=="100019")
@@ -1738,7 +1771,19 @@ dataset %>%
   skimr::skim()#n=58.36%
 ```
 
+Plot treatment dates in the SACT dataset:
+```{r}
+#Plot dates of follow-up status
+admin_dates<-dataset %>% 
+  select(ADMINISTRATION_DATE) 
 
+admin_dates$admin_date<-format(as.Date(admin_dates$ADMINISTRATION_DATE),  "%Y")
+
+admin_plot<-ggplot(data=admin_dates, aes(x=admin_date))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment dates", bins =4)+theme(plot.title=element_text(hjust=0.5))+xlab("")+ylab("Number of treatments")+ theme(axis.text.x=element_text(angle=90))
+
+#Write plot of follow up dates
+ggsave("treatment_dates.png",plot=admin_plot)
+```
 
 
 Merge to IMD table:
@@ -1752,16 +1797,14 @@ Merge to IMD table:
 dataset<-deprivation_table %>% 
   select(-PSEUDO_TUMOURID) %>% 
   right_join(dataset,by="PSEUDO_PAT")
+
+dataset %>% 
+  select(IMD2004:IMD2015_1) %>% 
+  skimr::skim()
 ```
 
 Link trust codes to get regional information
 ```{r}
-trustcodes <- 
-  read_csv("trust_codes.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL)
-
 dataset<-trustcodes %>% 
   rename(ORGANISATION_CODE_OF_PROVIDER=Code) %>% 
   rename(CENTRETYPE=DGH) %>% 
@@ -1769,7 +1812,14 @@ dataset<-trustcodes %>%
   rename(REGION="Commissioning region") %>% 
   select(REGION , ORGANISATION_CODE_OF_PROVIDER, CENTRETYPE) %>% 
   distinct(ORGANISATION_CODE_OF_PROVIDER,.keep_all=T) %>% 
-  right_join(dataset, by = "ORGANISATION_CODE_OF_PROVIDER")
+  right_join(dataset, by = "ORGANISATION_CODE_OF_PROVIDER") %>% 
+  group_by(PSEUDO_PAT) %>% 
+  fill(REGION, .direction="updown") %>% 
+  fill(CENTRETYPE, .direction="updown") %>% 
+  ungroup()
+
+dataset %>% 
+  filter(is.na(REGION)) %>% count(PSEUDO_PAT) #n=4/23744 patients have no region or centre type
 ```
 
 Fill patient characteristic fields to complete data where HES records have been added:
@@ -1877,7 +1927,7 @@ SUMMARYTABLE<-dataset %>%
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
-  select(AGE,AGE2, ethnicitygroup, ETHNICITY2, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI,BMI2, PS,HISTOLOGY_CODED_DESC, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE, ADMINISTRATION_DATE, DIAGNOSISDATEBEST) %>% 
+  select(AGE,AGE2, ethnicitygroup, ETHNICITY2,ETHNICITYNAME, SEX, VITALSTATUS, REGION, CENTRETYPE, BMI,BMI2, PS, IMD2015_1,VITALSTATUS,STAGE_BEST_CLEAN,GRADE, ADMINISTRATION_DATE, DIAGNOSISDATEBEST) %>% 
   tbl_summary(by=NULL) %>% 
   add_n()
 
@@ -1900,40 +1950,3 @@ dataset %>%
 ```
 
 
-
-
-```{r}
-ggplot(data=dataset, aes(x=datemonth))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Treatment date distribution (SACT dataset)", bins =30)+theme(plot.title=element_text(hjust=0.5))+ylab(" ")+xlab("Year")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))
-
-sact_cohort<-sact_cohort %>% 
-  mutate(AGE=as.numeric(AGE))
-
-ggplot(data=sact_cohort, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y _continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
-
-
-
-ggplot(data=NCRD, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.8)+theme(ylab=FALSE)+labs(title="Age distribution (NCRD dataset)")+theme(plot.title=element_text(hjust=0.5))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(limits=c(18,100))
-
-gghistogram(sact_cohort$BMI,y="count", ylab="Number of patients",xlab="Body mass index", width=0.8, fill="darkgreen", title = "Body mass index distribution (SACT)", bins =150,add="median") +theme(plot.title=element_text(hjust=0.5))
-
-
-ggplot(data=sact_cohort, aes(x=IMD2015_1))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="Index of multiple deprivation distribution (SACT dataset)")+theme(plot.title=element_text(hjust=0.4))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())
-
-
-ggplot(data=sact_cohort, aes(x=STAGE_BEST_CLEAN))+geom_bar(fill="darkgreen", width=0.5)+theme(ylab=FALSE)+labs(title="FIGO staging (SACT dataset)")+theme(plot.title=element_text(hjust=0.4))+ylab("Number of patients")+xlab("Age (years")+scale_y_continuous(breaks=pretty_breaks())
-
-NCRD %>% 
-  count(AGE)
-```
-
-Check NCRAS diagnosis dates and plot over time. This shows the spread of data.
-```{r}
-NCRAS_diagnoses<-tumour_table %>% 
-  mutate(DIAGNOSISDATEBEST=epiyear(dmy(DIAGNOSISDATEBEST)))
-
-hist(NCRAS_diagnoses$DIAGNOSISDATEBEST)
-
-#Plot all NCRAS diagnoses by year
-NCRAS_all_diagnoses_2012_2022<-gghistogram(NCRAS_diagnoses$DIAGNOSISDATEBEST,y="count", ylab=FALSE, xlim=c(1980,2022), fill="darkgreen", xlab="Year", bins =40, title = "Cancer diagnoses by year")+theme(plot.title=element_text(hjust=0.5))
-NCRAS_all_diagnoses_2012_2022<-gghistogram(NCRAS_diagnoses$DIAGNOSISDATEBEST,y="count", ylab=FALSE, xlim=c(2000,2022), fill="darkgreen", xlab="Year", bins =80, title = "Cancer diagnoses by year")+theme(plot.title=element_text(hjust=0.5))
-```
