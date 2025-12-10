@@ -19,31 +19,61 @@ library(readr)
 library(here)
 library(knitr)
 library(gtsummary)
-setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio\\Study 2")
-getwd()
-#Apply updated cohort from 25NOV24 n=29297
-updatedovariancohort<-read_csv(
-  "gynae_sact_cohort_25NOV24.csv",
+
+#Read in linked cohort (see Chapter 4 - Data Linkage for specification)
+cohort<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 4 - Data Linkage\\ovarian_cohort20NOV.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL) 
-
+#Read in NHS organisational codes and regional information
 trust_codes<-read_csv(
  "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/Surgery to adjuvant treatment/trust_codes2.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
-  col_select = NULL) #trust codes for NHS sites
+  col_select = NULL) 
 
-load("treatment_table,.rda")
-load("HESAPC.rda")
-load("HES_chemo.rda")
+#NCRAS registry datasets
+  patient_table<-read_csv(
+  "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/ODR1920_080_AV_Patient_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+  
+  tumour_table<-read_csv(
+  "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/ODR1920_080_AV_Tumour_2019Data_v2.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+  
+treatment_table<-read_csv(
+  "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/ODR1920_080_AV_Treatment_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+ deprivation_table<-read_csv(
+  "K:/QNAP/BRCT/SACT project/LSanalysis/Rstudio/ODR1920_080_AV_IMD_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+#Load HES tables generated in initial data linkage
+load("K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//HESAPC.rda") #HES admitted patient care cohorttrust_codes<-read_csv(
+load("K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//HES_chemo.rda") #HES chemotherapy records 
+HESAPC %>% 
+   count(PSEUDO_PAT)#n=44,682
 ```
 
-Link surgery data:
-
 ```{r}
-updatedovariancohort %>% 
-  count(PSEUDO_PAT) # n=29297
+setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 6  - Target trial emulation study")
+getwd()
+```
+
+Find surgery data in NCRD:
+```{r}
+cohort %>% 
+  count(PSEUDO_PAT) # n=23,774
 
 #Identify hysterectomy and other relevant surgeries
 treatment_table %>% 
@@ -54,6 +84,13 @@ ncras_surgery<-treatment_table %>%
   distinct(PSEUDO_PAT, PSEUDO_TUMOURID, EVENTDATE,.keep_all=T) %>% 
   select(PSEUDO_PAT, EVENTDATE,OPCS4_CODE)
 
+ncras_surgery %>% 
+  count(PSEUDO_PAT) #n=35,510 have a hysterectomy record in NCRAS. This is not necessarily related to OC.
+```
+
+
+Find surgery data in HES:
+```{r}
 hes_surgery<-HESAPC %>% 
   filter(str_detect(OPERTN_01, "q07|q08|q22|Q07|Q08|Q22")) %>% 
   distinct(PSEUDO_PAT, ADMIDATE,.keep_all=T) %>% 
@@ -68,26 +105,24 @@ all_surgery<-rbind(ncras_surgery,hes_surgery) %>%
 all_surgery %>% 
   count(PSEUDO_PAT) #n=38,419 patients with hysterectomy or bilateral salpinoophrctomy
 #CHECK THIS - too many excluded here, need to see 
-updatedovariancohort<-all_surgery %>% 
-  right_join(updatedovariancohort, by= "PSEUDO_PAT")
 
-updatedovariancohort %>% 
-  count(PSEUDO_PAT) #n=19,112 patients with surgery record in ncras or hes
+ovariansurgerycohort<-all_surgery %>% 
+  right_join(cohort, by= "PSEUDO_PAT")
+
+ovariansurgerycohort %>% 
+  filter(!is.na(EVENTDATE)) %>% 
+  count(PSEUDO_PAT) #n=15,256/23,774 patients with surgery record in ncras or hes
 ```
 
 # Part 1: Definition of the study cohort
-
-Firstly, filter the dataset for ovarian cancer diagnosis defined by C56/48/57. n=19112 ovarian patients in total by IDC10 c56/c57/c48. n=19112 total in the NCRD, with surgery record available
+Confirm n=23,774 as per initial data linkage
 
 ```{r}
-ovariansurgerycohort<-updatedovariancohort
-
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=29297 ovarian cancer, PP or FT patients in total
+  count(PSEUDO_PAT) #n=23,774 ovarian cancer
 ```
 
 Count missingness of stage data:
-
 ```{r}
 ovariansurgerycohort %>% 
  filter(is.na(STAGE_BEST_CLEAN)) %>% 
@@ -95,7 +130,6 @@ ovariansurgerycohort %>%
 ```
 
 Add a flag for patients who received beva/parp but have missing stage info. If they received a PARP, they are advanced-stage disease as they can only be accessed in advanced patients.
-
 ```{r}
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   ungroup() %>% 
@@ -106,18 +140,18 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
 ovariansurgerycohort %>%
 ungroup() %>%
 filter(is.na(STAGE_BEST_CLEAN)&advancedstageflag==1)  %>%
-count(PSEUDO_PAT)#n=744 patients who have missing stage data but received PARP or BEV and are therefore advanced stage
+count(PSEUDO_PAT)#n=521 patients who have missing stage data but received PARP or BEV and are therefore advanced stage
 
 ovariansurgerycohort<-ovariansurgerycohort %>%
   mutate(STAGE_BEST_CLEAN=ifelse(advancedstageflag==1&is.na(STAGE_BEST_CLEAN), "Advanced unspecified",STAGE_BEST_CLEAN))
 ```
 
-n=19112 before this exclusion 2d: Exclude patients listed as stage I, or IIA n=12612 after this step n=892 excluded due to stage: N=4286 have no stage data, n=2908 are listed as early-stage disease
+n=23,774 before this exclusion 2d: Exclude patients listed as stage I, or IIA n=12612 after this step n=892 excluded due to stage: N=4286 have no stage data, n=2908 are listed as early-stage disease
 
 ```{r}
 ovariansurgerycohort %>% 
   ungroup() %>%
-  count(PSEUDO_PAT) #n=29297
+  count(PSEUDO_PAT) #n=23,774
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   ungroup() %>% 
@@ -130,23 +164,23 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
 
 ovariansurgerycohort %>% 
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=20305
+  count(PSEUDO_PAT) #n=17,397
 
 ovariansurgerycohort %>% 
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   count(STAGE_BEST_CLEAN) 
-#
-#2B	710			
-#2C	258			
-#3	2479			
-#3A	959			
-#3B	1083			
-#3C	7749			
-#4	4459			
-#4A	710			
-#4B	1154			
-#Advanced unspecified	744
+
+#2B	680			
+#2C	208			
+#3	1812			
+#3A	858			
+#3B	941			
+#3C	6777			
+#4	3893			
+#4A	666			
+#4B	1041			
+#Advanced unspecified	521
 ```
 
 Add a flag for bevacizumab or PARPi maintenance therapy:
@@ -168,11 +202,11 @@ maintenanceflagtable<-ovariansurgerycohort %>%
   distinct(PSEUDO_PAT,.keep_all=T)
 ```
 
-n=20305 before exclusion 1b: Exclusion remove drugs of non-interest: N=505 excluded here: n=12107 after exclusion. This also excludes patients who have PLD listed as their first regimen - this is okay because we want to preserve first-line platinum chemotherapy only.
-
+n=17,397 before exclusion 1b: Exclusion remove drugs of non-interest: N=505 excluded here: n=12107 after exclusion. This also excludes patients who have PLD listed as their first regimen - this is okay because we want to preserve first-line platinum chemotherapy only.
+n=16,865 after
 ```{r}
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=20305 patients in total
+  count(PSEUDO_PAT) #n=17,397 patients in total
 
 ovariansurgerycohort %>% 
   count(DRUG_GROUP)
@@ -201,15 +235,16 @@ ovariansurgerycohort<-ovariansurgerycohort %>% #Then filter only patients who ha
   ungroup() 
 
 ovariansurgerycohort %>% 
-    count(PSEUDO_PAT) #19484
+    count(PSEUDO_PAT) #16,865
 ```
 
 
-n=19484 before Calculate time from diagnosis to first SACT and exclude those not treated within 90 days. This is the expected time frame based on Shibani's comment. n=14628 after 4856 excluded
+n=16,865 before Calculate time from diagnosis to first SACT and exclude those not treated within 90 days. This is the expected time frame based on Shibani's comment. 
+n=#n=14,513 after 
 
 ```{r}
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=19484
+  count(PSEUDO_PAT) #n=16,865
 
 ovariansurgerycohort<-ovariansurgerycohort %>%
   group_by(PSEUDO_PAT) %>% 
@@ -229,29 +264,15 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
  filter(diagnosistotreat<181&diagnosistotreat>-1)
 
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=16016
+  count(PSEUDO_PAT) #n=14,513
 ```
 
-n=16016 before this exclusion 2E filter out patients under 18 years of age: N=8 patients excluded by this step N=16008 after this exclusion
-
-```{r}
-ovariansurgerycohort %>% 
-  ungroup() %>% 
-  count(PSEUDO_PAT) #n=16016
-
-ovariansurgerycohort<-ovariansurgerycohort %>% 
-  filter(AGE>17)
-
-ovariansurgerycohort %>% 
-  ungroup() %>% 
-  count(PSEUDO_PAT) #n=16008
-```
-
-n=16008 before 2F: Exclude patients who have a record of SACT AFTER death: n=5 excluded n=14616
-
+2F: Exclude patients who have a record of SACT AFTER death: n=5 excluded n=14616
+n=14,513 before 
+n=14,508 after
 ```{r}
 ovariansurgerycohort %>%
-count(PSEUDO_PAT)#n=16008
+count(PSEUDO_PAT)#n=14,513
 
 ovariansurgerycohort<-ovariansurgerycohort %>%
   mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>% 
@@ -266,7 +287,7 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
    filter(is.na(exclude))
 
 ovariansurgerycohort %>%
-count(PSEUDO_PAT) #n=16002
+count(PSEUDO_PAT) #n=14,508
 ```
 
 2bi: Bring in HES records of chemo to incorporate any additional chemotherapy that is not recorded in SACT:
@@ -322,7 +343,7 @@ ovariansurgerycohort<-rbind(cohort_dates,HES_dates) %>% #create list of all SACT
 EXCLUSION: remove patients who have chemo records in HES from more than 3 months before the SACT dataset. This means they had chemo and that the first records are not necessarily first line treatment: m=16002 before n=15794 after n=128 excluded because first chemo is in HES and treatment data not given 2biii: Need to adjust for chemo that is not related to the SACT record:
 
 ```{r}
-ovariansurgerycohort %>% count(PSEUDO_PAT)#n=16002
+ovariansurgerycohort %>% count(PSEUDO_PAT)#n=14,508
 
 cohort_dates<-cohort_dates %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -338,14 +359,14 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   fill(exclusion_first_line,.direction="updown") %>% 
   filter(is.na(exclusion_first_line)) %>% ungroup() #Filter out HES chemo records more than 90 days before as this is presumably not related to the first-line therapy
 
-ovariansurgerycohort %>% count(PSEUDO_PAT) #15794
+ovariansurgerycohort %>% count(PSEUDO_PAT) #14,348
 
 ```
 
-n=15794 2bii: Define lines of therapy. Start with line=1 and flag as new regimen when days between SACT is 120 days or more.
-
+2bii: Define lines of therapy. Start with line=1 and flag as new regimen when days between SACT is 120 days or more.
+n=14,348 before
 ```{r}
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=15794
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=14,348
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -372,14 +393,14 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   group_by(PSEUDO_PAT) %>% 
   fill(lineoftherapy,.direction = "down")
 
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=15794
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=14,348
 ```
 
-n=15794 before this exclusion Exclude patients who have been labelled with PLD as first-line. 
-n=13716 after this exclusion
+n=14,348 before this exclusion Exclude patients who have been labelled with PLD as first-line. 
+n=12,436 after this exclusion
 
 ```{r}
-ovariansurgerycohort %>%count(PSEUDO_PAT) #n=15794
+ovariansurgerycohort %>%count(PSEUDO_PAT) #n=14,348
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
@@ -388,7 +409,7 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   select(PSEUDO_PAT) %>% 
   merge(ovariansurgerycohort, by = "PSEUDO_PAT") 
 
-ovariansurgerycohort %>% count(PSEUDO_PAT) #n=13716
+ovariansurgerycohort %>% count(PSEUDO_PAT) #n=12,436
 ```
 
 Flag platinum rechallenge where time between carboplatin and treatments are less than 180 days apart.
@@ -396,7 +417,7 @@ Flag platinum rechallenge where time between carboplatin and treatments are less
 ```{r}
 ovariansurgerycohort %>%
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=13716
+  count(PSEUDO_PAT) #n=12,436
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   mutate(DAYSFROMPREVIOUSADMIN=ifelse(is.na(DAYSFROMPREVIOUSADMIN)|DAYSFROMPREVIOUSADMIN==0,NA,DAYSFROMPREVIOUSADMIN)) %>% 
@@ -414,7 +435,7 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
 
 ovariansurgerycohort %>%
   ungroup() %>% 
-  count(PSEUDO_PAT) #n=13716
+  count(PSEUDO_PAT) #n=12,436
 ```
 
 save baseline characteristics:
@@ -439,7 +460,7 @@ cycle_numbers<-ovariansurgerycohort %>%
 
 cycle_numbers %>% 
   ungroup() %>% 
-  count(PSEUDO_PAT)#n=13716
+  count(PSEUDO_PAT)#n=12,436
 
 #Adjust cycle numbers
 cycle_numbers %>% 
@@ -461,14 +482,14 @@ cycle_numbers<-cycle_numbers %>%
   mutate(timeontreatment=as.numeric(difftime(max(ADMINISTRATION_DATE),min(ADMINISTRATION_DATE), units="days")))
 
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=13716
+  count(PSEUDO_PAT)#n=12,436
 ```
 
 Filter out treatments more than 63 days from previous SACT - this is the measure of a new line of therapy as per previous studies:
-
+no patients excluded
 ```{r}
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=13716
+  count(PSEUDO_PAT)#n=12,436
 
 cycle_numbers<-cycle_numbers %>% 
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
@@ -479,12 +500,12 @@ cycle_numbers<-cycle_numbers %>%
   ungroup()
 
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=13716
+  count(PSEUDO_PAT)#n=12,436
 ```
 
 ```{r}
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=13716
+  count(PSEUDO_PAT)#n=12,436
 
 #rm(cycle_numbers)
 #Calculate mean difference in cycle lengths
@@ -502,7 +523,7 @@ cycle_numbers<-
 
 
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=11606 completed first line chemo within 2-9 weeks
+  count(PSEUDO_PAT)#n=10,479 completed first line chemo within 2-9 weeks
 
 cycle_numbers %>% 
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
@@ -537,33 +558,31 @@ cycle_numbers<-baseline %>%
   merge(cycle_numbers, by = "PSEUDO_PAT")
 
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#n=11606
+  count(PSEUDO_PAT)#n=10,479 
 ```
 
 Assumptions needed for time between cycles to accurately define 3 weekly carboplatin/paclitaxel.
 
 ```{r}
 cycle_numbers %>%  
-  count(PSEUDO_PAT) #n=11606
+  count(PSEUDO_PAT) #n=10,479 
 
 cycle_numbers<-cycle_numbers %>%  
   mutate(CYCLE_NUMBER=ifelse(is.na(CYCLE_NUMBER),1,CYCLE_NUMBER))
-
-cycle_numbers$CYCLE_NUMBER
 ```
 
 Filter cycles before 21 - this retains patients who had weekly treatment
 
 ```{r}
 cycle_numbers %>%  
-  count(PSEUDO_PAT) #n=11606
+  count(PSEUDO_PAT) #n=10,479
 
 
 cycle_numbers2<-cycle_numbers %>%  
 filter(CYCLE_NUMBER<22)
 
 cycle_numbers2 %>%  
-  count(PSEUDO_PAT) #n=11606
+  count(PSEUDO_PAT) #n=10,479
 ```
 
 
@@ -584,7 +603,7 @@ cycle_numbers %>%
   summary()
 
 cycle_numbers %>% 
-  count(PSEUDO_PAT)#N=11606
+  count(PSEUDO_PAT)#N=#n=10,479
 
 cycle_numbers %>%  
   group_by(PSEUDO_PAT) %>% 
@@ -593,30 +612,26 @@ cycle_numbers %>%
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   count(number_of_cycles)
 
-
-#2	337			
-#3	1206			
-#4	1306			
-#5	761			
-#6	5319			
-#7	571			
-#8	240			
-#9	137			
-#10	95			
-#11	86
+#number_of_cycles
+#2	328			
+#3	1109			
+#4	1186			
+#5	704			
+#6	4803			
+#7	499			
+#8	225			
+#9	128			
+#10	93			
+#11	82
 
 cycle_numbers %>% 
   distinct(PSEUDO_PAT, CYCLE_NUMBER,.keep_all=T) %>% 
-count(PSEUDO_PAT)#n=11606
+  count(PSEUDO_PAT)#n=10,479
 ```
 
 ################ 
-
-
 ```{r}
-cycle_numbers
-#ovariansurgerycohort<-cycle_numbers
-cycle_numbers %>% count(PSEUDO_PAT) #n=11606
+cycle_numbers %>% count(PSEUDO_PAT) #n=10,479
 
 adjuvanttreatmenttime<-cycle_numbers %>% 
   ungroup() %>% 
@@ -632,17 +647,20 @@ adjuvanttreatmenttime<-cycle_numbers %>%
   select(PSEUDO_PAT, adjuvantbreak, surgerychemotime) %>% 
   ungroup()
 
+cycle_numbers %>% 
+  count(PSEUDO_PAT)
+
+adjuvanttreatmenttime %>% 
+  count(PSEUDO_PAT) #n=6,309 patients with surgery record
 
 ovariansurgerycohort<-cycle_numbers %>% 
   merge(adjuvanttreatmenttime, by = "PSEUDO_PAT") 
 
-ovariansurgerycohort %>% count(PSEUDO_PAT)# N=7147 patients 
+ovariansurgerycohort %>% count(PSEUDO_PAT)# N=6,309 patients  had surgery
 ```
 
-Then need to flag PDS or IDS treatment:
-
+Then flag PDS or IDS surgery setting:
 ```{r}
-	
 ovariansurgerycohort %>% 
   select(PSEUDO_PAT,ADMINISTRATION_DATE,EVENTDATE, surgerychemotime)
 
@@ -668,10 +686,10 @@ ovariansurgerycohort<-PDSIDS %>%
 
 ovariansurgerycohort %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  count(PDS,IDS) #n=2929patients had PDS only
+  count(PDS,IDS) #n=2,621 patients had PDS 
 
 ovariansurgerycohort %>%
-  count(PSEUDO_PAT) #n=4908 patients in total had surgery within 180 days of adjuvant chemotherapy. This includes htose who had neoadjuvant carbo/taxol chemotherapy before
+  count(PSEUDO_PAT) #n=4,311 patients in total had surgery within 180 days of adjuvant chemotherapy. This includes htose who had neoadjuvant carbo/taxol chemotherapy before
 
 ```
 
@@ -686,14 +704,6 @@ code<-baseline %>%
 trust_codes %>% 
   ungroup() %>% 
   skimr::skim() #Commissioning Region and centre type are complete -  this is what we need
-
-#ovariansurgerycohort<-trust_codes %>% 
-#  rename(ORGANISATION_CODE_OF_PROVIDER=Code) %>% 
- # merge(code,by="ORGANISATION_CODE_OF_PROVIDER") %>% 
-#  select(ORGANISATION_CODE_OF_PROVIDER, `Commissioning region`, `Academic hospital`) %>% 
- # right_join(ovariansurgerycohort, by = "ORGANISATION_CODE_OF_PROVIDER") %>% 
- # mutate(CENTRE_TYPE=ifelse(`Academic hospital`=="Y","Academic","DGH")) 
-
 ```
 
 Assign surgical modality as one variable:
@@ -704,29 +714,28 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
 ```
 
 Filter only PDS patients as we cannot adjust for the break in surgery using the clone censor weight approach:
-
+n=4,311 before
+n=2,621 after
 ```{r}
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=4908
+  count(PSEUDO_PAT) #n=4,311
 
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   filter(modality=="PDS")# %>% 
 
-ovariansurgerycohort %>% count(PSEUDO_PAT) #n=2933
+ovariansurgerycohort %>% count(PSEUDO_PAT) #n=2,621
 ```
 
-Link to baseline table
-
+Link to baseline table:
 ```{r}
 ovariansurgerycohort<-baseline %>% 
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  #select(AGE, PSEUDO_PAT, AGE2, BMI,BMI2,IMD2015_1,STAGE_BEST_CLEAN,PS, ETHNICITYNAME, VITALSTATUS, VITALSTATUSDATE,CENTRETYPE,REGION) %>% #THIS CAN BE USED TO BRING IN MORE VARIABLES
   right_join(ovariansurgerycohort,by="PSEUDO_PAT") %>% 
   select(-EVENTDATE.x, -PDS, -IDS, -neoadjuvant, -adjuvant, -EVENTDATE.y, -adjuvantbreak,-surgerychemotime)
 
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT)
+  count(PSEUDO_PAT) #2,621
 ```
 
 Order by cycles select columns:
@@ -736,24 +745,18 @@ ovariansurgerycohort<-ovariansurgerycohort%>%
  # select(1:13,17,26,43,58,68,69,75:81) %>% 
   #select(-STAGE_BEST_CLEAN.x,-DRUG_GROUP.x) %>% 
   rename(AGE=AGE.x,
-        AGE2=AGE2.x,
         BMI=BMI.x,
-        BMI2=BMI2.x,
         STAGE_BEST_CLEAN=STAGE_BEST_CLEAN.y,
-        #PS=PS.x,
         ETHNICITYNAME=ETHNICITYNAME.x,
         VITALSTATUS=VITALSTATUS.x,
         VITALSTATUSDATE=VITALSTATUSDATE.x,
         CENTRETYPE=CENTRETYPE.x,
         REGION=REGION.x,
-        #DRUG_GROUP=DRUG_GROUP.x
 ) %>% 
   arrange(PSEUDO_PAT, CYCLE_NUMBER)
 
 hist(ovariansurgerycohort$CYCLE_NUMBER)
 
-ovariansurgerycohort %>% 
-count(CYCLE_NUMBER)
 ```
 
 Histogram of number of cycles:
@@ -770,19 +773,13 @@ ggplot(plot, aes(x=`Number of cycles`))+geom_histogram(alpha = 0.5 , position = 
 plot2<-plot %>% 
   select(PSEUDO_PAT,`Number of cycles`, regimen) %>% 
   distinct(PSEUDO_PAT,.keep_all=T)
-ggplot(plot2, aes(x = `Number of cycles`,fill = regimen, colour=regimen)) + labs(y="Number of patients")+
+
+histogram_cycles<-ggplot(plot2, aes(x = `Number of cycles`,fill = regimen, colour=regimen)) + labs(y="Number of patients")+
   geom_histogram(alpha = 0.5, position = "dodge") + scale_x_continuous(breaks = seq(2:9), lim = c(0,8))  
   
+
+ggsave("histogram_cycles.png")
 ```
-
-Check data completeness:
-
-```{r}
-ovariansurgerycohort %>% 
-  ungroup() %>% 
-  skimr::skim()
-```
-
 Define categories for age, BMI:
 
 ```{r}
@@ -803,7 +800,6 @@ ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME,
 ```
 
 Create 5-year survival outcome to use in imputation model:
-
 ```{r}
 ovariansurgerycohort<-ovariansurgerycohort %>% 
   rename(ADMINISTRATION_DATE=ADMINISTRATION_DATE.y) %>% 
@@ -815,31 +811,41 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   ungroup()
 
 ovariansurgerycohort %>% 
-  select(OVERALL_SURVIVAL)
-
-ovariansurgerycohort %>% 
-  count(DRUG_GROUP)
-
-ovariansurgerycohort %>% 
 ungroup() %>% 
-  count(PSEUDO_PAT) #n=2933
+  count(PSEUDO_PAT) #n=2,621
 
 ovariansurgerycohort %>% 
-  #filter(EVENT==1) %>% 
   select(OVERALL_SURVIVAL) %>% 
-  summary() #Median FU time 1073 days IQR 650-1634
+  summary() #Median FU time 997 days IQR 610-1533
 
 ovariansurgerycohort %>% 
   filter(EVENT==1) %>% 
   select(OVERALL_SURVIVAL) %>% 
-  summary() #Median survival in patients who died (1346 iqr 820-1999) 
+  summary() #Median survival in patients who died (1268 iqr 781-1956) 
 ```
 
-Calculate BMI and impute:
+Create a summary table to describe characteristics before imputation:
+```{r}
+ovariansurgerycohort %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(cycles=max(CYCLE_NUMBER)) %>% 
+  mutate(`Early discontinuation`=ifelse(cycles<6,1,0)) %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1.x,cycles,ETHNICITYNAME, REGION, CENTRETYPE,maintenanceflag.x) %>% 
+  tbl_summary(by=`Early discontinuation`)%>% 
+  add_p() %>% 
+  add_overall() %>% 
+  as_gt() %>% 
+  gt::gtsave("tableone_before_imputation.docx")
+  
+```
 
+
+Calculate BMI and impute:
 ```{r}
 ovariansurgerycohort %>%  
-  skimr::skim() #n=80.4% completeness for BMI
+  skimr::skim() #n=95.5% completeness for BMI
 
 #Imputation must have the outcome included in the model.
 imputationdata<-ovariansurgerycohort %>% 
@@ -857,28 +863,24 @@ summary(tempData$imp$BMI)
 completedData <- complete(tempData,1) #Completes the dataset with imputed data
 ovariansurgerycohort<-completedData %>% 
   select(PSEUDO_PAT, BMI,PS) %>% 
-  merge(ovariansurgerycohort, by ="PSEUDO_PAT")
-
-
-ovariansurgerycohort<-ovariansurgerycohort %>% 
+  merge(ovariansurgerycohort, by ="PSEUDO_PAT") %>% 
   select(-BMI.y) %>% 
   rename(BMI=BMI.x)
 
 ovariansurgerycohort %>% 
-  count(PSEUDO_PAT) #n=2933
-
-ovariansurgerycohort %>% 
-  skimr::skim(  )
+  count(PSEUDO_PAT) #n=2,621
 ```
 
 Rename columns:
-
 ```{r}
 cohort<-ovariansurgerycohort %>% 
-  rename(PSEUDO_TUMOURID=PSEUDO_TUMOURID.x.x) %>% 
-  rename(IMD2015_1=IMD2015_1.x) %>% 
+  rename(PSEUDO_TUMOURID=PSEUDO_TUMOURID.y) %>% 
+  rename(IMD2015_1=IMD2015_1.x) %>%  
+  rename(HISTOLOGY_CODED=HISTOLOGY_CODED.x) %>% 
+    rename(HISTOLOGY_CODED_DESC=HISTOLOGY_CODED_DESC.x) %>% 
+    rename(GRADE=GRADE.x) %>% 
     rename(maintenanceflag=maintenanceflag.x) %>% 
-  select(PSEUDO_PAT,PSEUDO_TUMOURID,REGION,DRUG_GROUP,REGION,  CENTRETYPE,ADMINISTRATION_DATE,CYCLE_NUMBER, BMI,IMD2015_1, ETHNICITYNAME, VITALSTATUS, VITALSTATUSDATE, AGE,AGECATEGORY,STAGE_BEST_CLEAN,maintenanceflag) %>% 
+  select(PSEUDO_PAT,PSEUDO_TUMOURID,REGION,DRUG_GROUP,REGION,GRADE, CENTRETYPE,ADMINISTRATION_DATE,CYCLE_NUMBER, BMI,IMD2015_1, ETHNICITYNAME, VITALSTATUS,HISTOLOGY_CODED,HISTOLOGY_CODED_DESC, VITALSTATUSDATE, AGE,AGECATEGORY,STAGE_BEST_CLEAN,maintenanceflag) %>% 
   #rename(BMI=BMI.y.x) %>% 
   arrange(PSEUDO_PAT, CYCLE_NUMBER) %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -889,26 +891,8 @@ cohort %>%
 skimr::skim()
 ```
 
-Bring in histology:
-```{r}
-tumour_table<-read_csv(
-  "ODR1920_080_AV_Tumour_2019Data_v2.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL)
 
-
-grading<-tumour_table %>% 
-  right_join(cohort, by =c("PSEUDO_PAT", "PSEUDO_TUMOURID")) %>% 
-  select(HISTOLOGY_CODED,HISTOLOGY_CODED_DESC, GRADE,PSEUDO_PAT, PSEUDO_TUMOURID) 
-
-cohort<-tumour_table %>% 
-  select(HISTOLOGY_CODED,HISTOLOGY_CODED_DESC, GRADE,PSEUDO_PAT, PSEUDO_TUMOURID) %>% 
-  right_join(cohort, by =c("PSEUDO_PAT", "PSEUDO_TUMOURID")) #%>% 
-  #distinct(PSEUDO_PAT,.keep_all=T)
-```
-
-Clean histology and grade information
+Clean grade information
 
 ```{r}
 cohort<-cohort %>% 
@@ -918,7 +902,6 @@ cohort<-cohort %>%
   mutate(GRADE=ifelse(str_detect(GRADE,"G4|GH"),"High grade (G4/GH)",GRADE)) %>% 
   mutate(GRADE=ifelse(str_detect(GRADE,"GL|G1"),"Low grade (G1/GL)",GRADE)) %>% 
   mutate(GRADE=ifelse(str_detect(GRADE,"GX|GI"),"Unknown grade",GRADE))
-
 ```
 
 Write a .csv file for the arranged cohort before going any further.
@@ -938,11 +921,10 @@ cohort<-read_csv(
   col_select = NULL)
 
 cohort %>% 
-  count(PSEUDO_PAT)
+  count(PSEUDO_PAT) #n=2,621
 ```
 
 Link regimen list
-
 ```{r}
 cohort<-regimenlist %>% 
   right_join(cohort, by = "PSEUDO_PAT")
@@ -955,7 +937,7 @@ cohort<-cohort %>%
 
 ```{r}
 cohort %>%
-  count(PSEUDO_PAT) #n=2933 primary surgery only
+  count(PSEUDO_PAT) #n=2,621 primary surgery only
 
 cohort %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -983,7 +965,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
     mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
  # select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, #BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, EGION, CENTRETYPE) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED) %>% 
   tbl_summary(by=`Early discontinuation`) %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -1080,10 +1062,7 @@ cohort %>%
   gt::gtsave("study2_summary_AGECATEGORY.docx")
 ```
 
-```{r}
-grade<-cohort %>% 
-  select(PSEUDO_PAT, GRADE, HISTOLOGY_CODED_DESC)
-```
+
 
 # 2: Data manipulation to create the table for clone censor weight analysis.
 
