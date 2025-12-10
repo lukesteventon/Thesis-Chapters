@@ -849,23 +849,34 @@ ovariansurgerycohort %>%
 
 #Imputation must have the outcome included in the model.
 imputationdata<-ovariansurgerycohort %>% 
-  rename(IMD2015_1=IMD2015_1.x) %>% 
+  rename(IMD2015_1=IMD2015_1.x) %>%
+  mutate(IMD2015_1=ifelse(str_detect(IMD2015_1,"1"),"1",IMD2015_1)) %>% 
+  mutate(IMD2015_1=ifelse(str_detect(IMD2015_1,"5"),"5",IMD2015_1)) %>% 
+  mutate(IMD2015_1=as.numeric(IMD2015_1)) %>% 
   rename(PS=PS.x) %>% 
   distinct(PSEUDO_PAT, .keep_all=T) %>% 
   select(PSEUDO_PAT,CENTRETYPE, REGION, ETHNICITYNAME, IMD2015_1,PS, AGE, STAGE_BEST_CLEAN, BMI, OVERALL_SURVIVAL, EVENT) #Includes overall survival and event outcome
+
+
+imputationdata %>% 
+  skimr::skim()
 
 tempData <- mice(imputationdata,m=20,maxit=20,meth='pmm')
 summary(tempData)
 
 tempData$imp$BMI #Checks imputed data for a specified variable
 tempData$imp$PS
+tempData$imp$IMD2015_1
 summary(tempData$imp$BMI)
+summary(tempData$imp$IMD2015_1)
 completedData <- complete(tempData,1) #Completes the dataset with imputed data
 ovariansurgerycohort<-completedData %>% 
-  select(PSEUDO_PAT, BMI,PS) %>% 
+  select(PSEUDO_PAT, BMI,IMD2015_1) %>%
+  rename(IMD2015_1_new=IMD2015_1) %>% 
   merge(ovariansurgerycohort, by ="PSEUDO_PAT") %>% 
-  select(-BMI.y) %>% 
-  rename(BMI=BMI.x)
+  select(-IMD2015_1.y) %>% 
+  rename(BMI=BMI.x) %>% 
+  select(-BMI.y) 
 
 ovariansurgerycohort %>% 
   count(PSEUDO_PAT) #n=2,621
@@ -875,7 +886,8 @@ Rename columns:
 ```{r}
 cohort<-ovariansurgerycohort %>% 
   rename(PSEUDO_TUMOURID=PSEUDO_TUMOURID.y) %>% 
-  rename(IMD2015_1=IMD2015_1.x) %>%  
+  select(-IMD2015_1) %>% 
+  rename(IMD2015_1=IMD2015_1_new) %>%  
   rename(HISTOLOGY_CODED=HISTOLOGY_CODED.x) %>% 
     rename(HISTOLOGY_CODED_DESC=HISTOLOGY_CODED_DESC.x) %>% 
     rename(GRADE=GRADE.x) %>% 
@@ -965,7 +977,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
     mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
  # select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, #BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, EGION, CENTRETYPE) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED) %>% 
+   select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION,PS, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE) %>% 
   tbl_summary(by=`Early discontinuation`) %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -987,7 +999,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION,PS, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE) %>% 
   tbl_summary(by="ETHNICITY2") %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -1009,7 +1021,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION,PS, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE) %>% 
   tbl_summary(by="IMD2015_1") %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -1031,7 +1043,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION,PS, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE) %>%  
   tbl_summary(by="REGION") %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -1053,7 +1065,7 @@ cohort %>%
   mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
   mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
-  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION,PS, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE) %>% 
   tbl_summary(by="AGECATEGORY") %>% 
   add_overall() %>% 
   add_p() %>% 
@@ -1080,7 +1092,7 @@ pivottable<-ccw_data %>%
   distinct(PSEUDO_PAT, CYCLE_NUMBER,.keep_all=T)
 
 pivottable %>% 
-  count(PSEUDO_PAT)#n=2278 patients who had PDS with 180 days and included
+  count(PSEUDO_PAT)#n=2278 patients who had PDS withins 180 days and included
 
 survival<-baseline_characteristics %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -1549,7 +1561,7 @@ Then finally link baseline covariates back to the dataset:
 ```{r}
 dataset<-baseline_characteristics %>%
   distinct(PSEUDO_PAT,.keep_all=T) %>%
-  select(PSEUDO_PAT, BMI, REGION, CENTRETYPE ,ETHNICITYNAME, AGE,BMI, STAGE_BEST_CLEAN, IMD2015_1, VITALSTATUS,VITALSTATUSDATE,yearoftreatment) %>% 
+  select(PSEUDO_PAT, BMI, REGION, CENTRETYPE ,ETHNICITYNAME,GRADE, AGE,BMI, STAGE_BEST_CLEAN, IMD2015_1, VITALSTATUS,VITALSTATUSDATE,yearoftreatment) %>% 
   ungroup() %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   right_join(finalCCWtable, by ="PSEUDO_PAT")
@@ -1730,14 +1742,6 @@ data_with_censoring%>%
   count(maintenanceflag)
 ```
 
-Link grade information
-
-```{r}
-data_with_censoring<-grade %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  merge(data_with_censoring, by = "PSEUDO_PAT") 
-```
-
 Then adjust censoring when patients die. This imposes a value of censor=1 when patients die - there will be a period between end of treatment and death where censor=0 if they adhere to the treatment strategy.
 ```{r}
 data_with_censoring<-data_with_censoring %>% 
@@ -1817,11 +1821,19 @@ less_than_six_cycles %>%
 
 ```{r}
 library(parsnip)
+
+deprivation_table %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+merge(sixcycles, by= "PSEUDO_PAT") %>% select(IMD2015_1,DEPRIVATION) %>% 
+  mutate(DEPRIVATION=ifelse(is.na(DEPRIVATION),IMD2015_1, DEPRIVATION)) %>% 
+  skimr::skim()
+
 #Logistic regression for probability of remaining uncensored at each time point
 probability_of_uncensoring<- glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
 REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles)
 
 summary(probability_of_uncensoring)
+
 sixcycles<-sixcycles %>% 
   mutate(p1=predict(probability_of_uncensoring, type = "response")) #This line creates a new column with probability of being uncensored at each time point
         
@@ -2244,7 +2256,7 @@ risk_curves_plot<-risk_curves %>%
 Bootstrapping- this is needed to run multiple analyses as the confidence intervals are very wide when we run this on only one dataset.
 ```{r}
 
-
+fedsafdsafdsa
 #combined_dataset %>% 
 #  select(ID,interval, numberofcycles, survivalmarker, discontinuation, strategy, maxcycles, discontinuationinterval,censor, row, time, timesq, time_strategy, timesq_strategy,p1,cumulative_probability_uncensored,IPCW) %>% 
 #write_csv("bootstrappingdataset.csv")
