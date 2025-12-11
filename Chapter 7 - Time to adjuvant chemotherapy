@@ -57,10 +57,6 @@ cohort<-read_csv(
 demographic_table<-cohort %>% 
   select(PSEUDO_PAT, IMD2015_1, ETHNICITYNAME)%>% 
   distinct(PSEUDO_PAT,.keep_all=T)
-
-
-cohort %>% 
-  count(ETHNICITYNAME)
 ```
 
 Check specified cohort file is correct - n=23,774 patients.
@@ -774,10 +770,9 @@ cohort<-cohort %>%
   group_by(PSEUDO_PAT) %>% 
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>%
   mutate(overall_survival=as.numeric(difftime(VITALSTATUSDATE, INDEX, units = "days"))) %>% 
-  mutate(EVENT=ifelse(overall_survival<1826&VITALSTATUS=="D",1,0)) %>% 
-  #mutate(overall_survival=ifelse(is.na(overall_survival),1826,overall_survival)) %>% 
+  mutate(EVENT=ifelse(overall_survival<1826&VITALSTATUS=="D",1,0)) %>% #for patients with missing follow up date, set to 5 years and assign no event
+  mutate(overall_survival=ifelse(is.na(overall_survival),1825,overall_survival)) %>% 
   mutate(EVENT=ifelse(is.na(EVENT),0,EVENT)) %>% 
-  #mutate(overall_survival=ifelse(is.na(overall_survival), 1825, overall_survival)) %>% 
   select(PSEUDO_PAT, overall_survival, EVENT) %>% 
   merge(cohort, by = "PSEUDO_PAT")
 
@@ -898,6 +893,8 @@ cohort %>%
   select(PS) %>% 
   skimr::skim() #PS 91.95% complete
 ```
+ients have survival status missing
+
 
 Create table one by surgical status. This includes imputed data.
 ```{r}
@@ -1001,10 +998,10 @@ Rejoin to original table:
 Rename to completed dataset to cohort for analysis:
 ```{r}
 cohort<-cohort %>% 
-  select(-BMI,-PS,)#Remove BMI and PS  from the cohort
+  select(-BMI,-PS,-IMD2015_1)#Remove BMI and PS  from the cohort
 
 cohort2<-completedData %>% 
-  select(PSEUDO_PAT, BMI,PS) %>% #Link imputed BMI and PS values
+  select(PSEUDO_PAT, BMI,PS,IMD2015_1) %>% #Link imputed BMI and PS values
   merge(cohort, by= "PSEUDO_PAT")
 
 imputationdataset %>% 
@@ -1068,12 +1065,11 @@ completecase<-cohort %>%
  select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE)
 
 cohort<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE)
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
   mutate(adjuvantbreak=as.numeric(adjuvantbreak)) %>% 
     mutate(AGE=as.numeric(AGE))
 
 tableone<-cohort%>% 
-  select(-PSEUDO_PAT) %>% 
   tbl_summary(by="modality",missing_text="(Missing)") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1212,7 +1208,7 @@ coxtable %>%
 
 Cox regression for adjuvant time as a continuous variable:
 ```{r}
-survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
+survival2<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreak+ modality+ Region+ CENTRETYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
 summary(survival2)
 
 coxtable2<-tbl_regression(survival2, exponentiate = TRUE)%>% 
@@ -1329,7 +1325,7 @@ Cox regression: 5 year OS for PDS only
 pds_analysis$Region<-as.factor(pds_analysis$Region)
 pds_analysis$Region<- relevel(pds_analysis$Region,ref = "LONDON COMMISSIONING REGION")
 
-survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=pds_analysis)
+survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRETYPE+ethnicitygroup+IMD2015_1+PS,data=pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
@@ -1345,7 +1341,7 @@ Cox regression: 5 year OS for IDS only
 ids_analysis$Region<-as.factor(ids_analysis$Region)
 ids_analysis$Region<- relevel(ids_analysis$Region,ref = "LONDON COMMISSIONING REGION")
 
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=ids_analysis)
+survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRETYPE+ethnicitygroup+IMD2015_1+PS,data=ids_analysis)
 summary(survival_IDS)
 
 
@@ -1359,133 +1355,3 @@ coxtable_IDS_only%>%
   gt::gtsave("cox_regression_IDS_only.docx")
 ```
 
-Complete case analysis using only patients with a complete PS from the NCRD/SACT dataset:
-```{r}
-completecase %>% 
-  count(PSEUDO_PAT) #n=3,753
-
-completecase$ethnicitygroup<-as.factor(completecase$ethnicitygroup)
-completecase$ethnicitygroup<- relevel(completecase$ethnicitygroup, ref = "White")
-```
-
-
-Complete-case analysis Cox regression: 5 year OS for PDS only.
-After imputation these are the same as the whole analysis:
-```{r}
-complete_case_pds_analysis<-completecase %>% 
-  filter(modality=="PDS")
-
-complete_case_pds_analysis$BMI2<- relevel(complete_case_pds_analysis$BMI2,ref = "[18.5,25)")
-complete_case_pds_analysis$`Commissioning region`<-as.factor(complete_case_pds_analysis$`Commissioning region`)
-complete_case_pds_analysis$`Commissioning region`<- relevel(complete_case_pds_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
-
-
-
-survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
-summary(survival_PDS)
-
-coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
-  add_n() #Gtsummary table for Cox regression analysis
-coxtable_PDS_only 
-
-coxtable_PDS_only
-
-coxtable_PDS_only%>%
-  as_gt() %>% 
-  gt::gtsave("complete_case_cox_regression_PDS_only.docx")
-```
-
-Check results are similar in complete-case analysis without including PS in the model:
-
-```{r}
-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_pds_analysis)
-summary(survival_PDS)
-
-#adjuvantbreakcategory [43,181), HR 1.0405   LCI- 0.89, HCI -  1.21)
-```
-
-Complete-case analysis Cox regression: 5 year OS for IDS only
-```{r}
-complete_case_ids_analysis<-completecase %>% 
-  filter(modality=="IDS")
-
-complete_case_ids_analysis$BMI2<- relevel(complete_case_ids_analysis$BMI2,ref = "[18.5,25)")
-complete_case_ids_analysis$`Commissioning region`<-as.factor(complete_case_ids_analysis$`Commissioning region`)
-complete_case_ids_analysis$`Commissioning region`<- relevel(complete_case_ids_analysis$`Commissioning region`,ref = "LONDON COMMISSIONING REGION")
- 
-survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_ids_analysis)
-summary(survival_IDS)
-
-coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
-  add_n() #Gtsummary table for Cox regression analysis
-coxtable_IDS_only 
-
-coxtable_IDS_only%>%
-  as_gt() %>% 
-  gt::gtsave("complete_case_cox_regression_IDS_only.docx")
-```
-
-Check results are consistent in complete-case without PS:
-```{r}
-check_IDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_ids_analysis)
-summary(check_IDS)
-
-
-  tbl_regression(check_IDS, exponentiate = TRUE) %>% 
-  as_gt() %>% 
-  gt::gtsave("complete_case_IDS_PS_excluded.docx")
-
-#HR 1.18 (1.04-1.36)
-```
-Check results are consistent in complete-case without PS:
-```{r}
-check_PDS<-
-  coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+AGECATEGORY +BMI2+bevflag+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
-
-  tbl_regression(check_PDS, exponentiate = TRUE) %>% 
-  as_gt() %>% 
-  gt::gtsave("complete_case_PDS_PS_excluded.docx")
-
-#HR 0.97 (0.82-1.18)
-```
- 
-Histograms of adjuvant time by strata:
-```{r}
-graphs<-cohort %>% 
-  mutate(AGECATEGORY=ifelse(AGECATEGORY=="[0,60)","<60",AGECATEGORY)) %>% 
-    mutate(AGECATEGORY=ifelse(AGECATEGORY=="[60,70)","60-70",AGECATEGORY)) %>% 
-  mutate(AGECATEGORY=ifelse(AGECATEGORY=="[70,150)",">70",AGECATEGORY)) 
-
-
-cohort$`Commissioning region`<-factor(cohort$`Commissioning region`, levels = c("EAST OF ENGLAND COMMISSIONING REGION", "MIDLANDS COMMISSIONING REGION", "LONDON COMMISSIONING REGION","NORTH EAST & YORKSHIRE COMMISSIONING REGION","NORTH WEST COMMISSIONING REGION", "SOUTH EAST COMMISSIONING REGION", "SOUTH WEST COMMISSIONING REGION"))
-
-
-cohort$AGECATEGORY<-factor(cohort$AGECATEGORY, levels = c("<60", "60-70", "<70"))
-
-
-hist_by_region<-
- ggplot(cohort, aes(x = adjuvantbreak, fill = `Commissioning region`, colour = `Commissioning region`)) + theme_minimal()+
-  geom_histogram(alpha = 0.5, position = "dodge") 
-
-ggscatter(cohort, x="Commissioning region",y="adjuvantbreak", fill="Commissioning region",
-          color="black", shape = 21, size=2,
-          add="reg.line",
-          add.params = list(color="blue", fill = "lightgray"),
-         # conf.int=TRUE,
-          #cor.coef=TRUE
-)
-
-
-ggplot(graphs, aes(y=`Commissioning region`,x=adjuvantbreak, fill =`Commissioning region` ))+geom_boxplot(show.legend = FALSE)+scale_fill_brewer(palette="Dark2")+theme_minimal()+xlab("Time to adjuvant chemotherapy (days)")+ylab(" ")
-
-ggplot(graphs, aes(y=AGECATEGORY,x=adjuvantbreak, fill =AGECATEGORY ))+geom_boxplot(show.legend = FALSE)+scale_fill_brewer(palette="Dark2")+theme_minimal()+xlab("Time to adjuvant chemotherapy (days)")+ylab("Age category")
-
-
-ggplot(graphs, aes(y=IMD2015_1,x=adjuvantbreak, fill =IMD2015_1 ))+geom_boxplot(show.legend = FALSE)+scale_fill_brewer(palette="Dark2")+theme_minimal()+xlab("Time to adjuvant chemotherapy (days)")+ylab(" ")
-
-ggplot(graphs, aes(y=modality,x=adjuvantbreak, fill =modality ))+geom_boxplot(show.legend = FALSE)+scale_fill_brewer(palette="Dark2")+theme_minimal()+xlab("Time to adjuvant chemotherapy (days)")+ylab(" ")
-```
