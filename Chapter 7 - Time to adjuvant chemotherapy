@@ -633,6 +633,8 @@ ovariansurgerycohort$BMI2<- relevel(ovariansurgerycohort$BMI2, ref = "[18.5,25)"
 ovariansurgerycohort$modality<-as.factor(ovariansurgerycohort$modality)
 ovariansurgerycohort$modality<- relevel(ovariansurgerycohort$modality, ref = "PDS")
 ovariansurgerycohort$ETHNICITYNAME<-as.factor(ovariansurgerycohort$ETHNICITYNAME)
+ovariansurgerycohort$`Commissioning region`<-as.factor(ovariansurgerycohort$`Commissioning region`)
+ovariansurgerycohort$`Commissioning region`<- relevel(ovariansurgerycohort$`Commissioning region`, ref = "LONDON COMMISSIONING REGION")
 ovariansurgerycohort<- ovariansurgerycohort %>% 
   mutate(ETHNICITYCATEGORY=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
   mutate(ETHNICITYCATEGORY=ifelse(str_detect(ETHNICITYNAME,"Unknown"),"Unknown",ETHNICITYCATEGORY))
@@ -673,228 +675,6 @@ ovariansurgerycohort$adjuvantbreakcategory<-cut(ovariansurgerycohort$adjuvantbre
 ovariansurgerycohort %>% write_csv("surgery_final_cohort_08OCT24.csv")
 ```
 
-As per David's comments, a frailty score can be constructed using HES diagnostic codes.
-This uses the SCARF methodology which been published and validated after being used in the breast cancer audit NABCOP. 
-ICD10 codes for frailty as per Gilbert et al 2018: https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(18)30668-8/fulltext
-```{r}
-#Read in the ovarian cohort for ease of use:
-ovariansurgerycohort <- read_csv(
-  "surgery_final_cohort_08OCT24.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL)
-#ovariansurgerycohort$PS<-cut(ovariansurgerycohort$PS, breaks=c(0,1,2,10), right = FALSE)
-ovariansurgerycohort$ETHNICITYNAME<-as.factor(ovariansurgerycohort$ETHNICITYNAME)
-ovariansurgerycohort$ETHNICITYNAME<- relevel(ovariansurgerycohort$ETHNICITYNAME, ref = "White")
-
-#Create  list of included patients:
-filterlist<-ovariansurgerycohort %>% 
-  distinct(PSEUDO_PAT)
-#Import HES APC records:
-#HESDIAGNOSIS1<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG2122_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS2<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG2021_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS3<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1920_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS4<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1819_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS5<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1718_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS6<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1617_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS7<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1516_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS8<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1415_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS9<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1314_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS10<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1213_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS11<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1112_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESDIAGNOSIS12<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1011_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-##Import HES OP records
-#HESOPDIAGNOSIS1<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG2122_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS2<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG2021_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS3<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1920_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS4<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1819_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS5<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1718_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL) %>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS6<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1617_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS7<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1516_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS8<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1415_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS9<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1314_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS10<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1213_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS11<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1112_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#HESOPDIAGNOSIS12<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1011_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)%>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-##Join HES APC data and write.csv
-#HES_all_data_bind1<-rbind(HESDIAGNOSIS1,HESDIAGNOSIS2)
-#HES_all_data_bind2<-rbind(HESDIAGNOSIS3,HESDIAGNOSIS4)
-#HES_all_data_bind3<-rbind(HESDIAGNOSIS5,HESDIAGNOSIS6)
-#HES_all_data_bind4<-rbind(HESDIAGNOSIS7,HESDIAGNOSIS8)
-#HES_all_data_bind5<-rbind(HESDIAGNOSIS9,HESDIAGNOSIS10)
-#HES_all_data_bind6<-rbind(HESDIAGNOSIS11,HESDIAGNOSIS12)
-#HES_bind12<-rbind(HES_all_data_bind1,HES_all_data_bind2)
-#HES_bind34<-rbind(HES_all_data_bind3,HES_all_data_bind4)
-#HES_bind56<-rbind(HES_all_data_bind5,HES_all_data_bind6)
-#HES_APC_data<-rbind(HES_bind12, HES_bind34,HES_bind56) %>% arrange(PSEUDO_PAT, DATAYEAR)
-#HES_APC_data#n=XXXX, %% of total of 6,536 patients
-#rm(HES_all_data_bind1,HES_all_data_bind2,HES_all_data_bind3,HES_all_data_bind4,HES_all_data_bind5,HES_all_data_bind6)
-#rm(HESDIAGNOSIS1,HESDIAGNOSIS2,HESDIAGNOSIS3,HESDIAGNOSIS4,HESDIAGNOSIS5,HESDIAGNOSIS6,HESDIAGNOSIS7,HESDIAGNOSIS8,HESDIAGNOSIS9,HE#SDIAGNOSIS10,HESDIAGNOSIS11,HESDIAGNOSIS12)
-#rm(HES_bind12,HES_bind34,HES_bind56)
-#HES_APC_data<-HES_APC_data%>% 
-#  select(PSEUDO_PAT, DATAYEAR, DIAG4_01:DIAG4_12) 
-#HES_APC_data%>% 
-#  write_csv("HES_APC_DIAG_23OCT24.csv")
-#HES_APC_data%>% 
-#  count(PSEUDO_PAT)#n=4442 of 6536
-#save(HES_APC_data, "HES_APC_data.rda")
-#```
-#
-#
-#```{r}
-#load()
-##Bind HES OP and write full file:
-#HESOPDIAGNOSIS12<-rbind(HESOPDIAGNOSIS1,HESOPDIAGNOSIS2)
-#HESOPDIAGNOSIS34<-rbind(HESOPDIAGNOSIS3,HESOPDIAGNOSIS4)
-#HESOPDIAGNOSIS56<-rbind(HESOPDIAGNOSIS5,HESOPDIAGNOSIS6)
-#HESOPDIAGNOSIS78<-rbind(HESOPDIAGNOSIS7,HESOPDIAGNOSIS8)
-#HESOPDIAGNOSIS910<-rbind(HESOPDIAGNOSIS9,HESOPDIAGNOSIS10)
-#HESOPDIAGNOSIS1112<-rbind(HESOPDIAGNOSIS11,HESOPDIAGNOSIS12)
-#HES_apocoperbind12<-rbind(HESOPDIAGNOSIS12,HESOPDIAGNOSIS34)
-#HES_apocoperbind34<-rbind(HESOPDIAGNOSIS56,HESOPDIAGNOSIS78)
-#HES_apocoperbind56<-rbind(HESOPDIAGNOSIS910,HESOPDIAGNOSIS1112)
-#HES_OP_data<-rbind(HES_apocoperbind12, HES_apocoperbind34,HES_apocoperbind56) %>% arrange(PSEUDO_PAT, DATAYEAR)
-#rm(HES_apocoperbind12,HES_apocoperbind34,HES_apocoperbind56)
-#rm(HESOPDIAGNOSIS1,HESOPDIAGNOSIS2,HESOPDIAGNOSIS3,HESOPDIAGNOSIS4,HESOPDIAGNOSIS5,HESOPDIAGNOSIS6,HESOPDIAGNOSIS7,HESOPDIAGNOSIS8,#HESOPDIAGNOSIS9,HESOPDIAGNOSIS10,HESOPDIAGNOSIS11,HESOPDIAGNOSIS12)
-#
-#HES_OP_data<-HES_OP_data%>% 
-#  select(PSEUDO_PAT, DATAYEAR, DIAG4_01:DIAG4_12) %>% 
-#  merge(filterlist, by = "PSEUDO_PAT")
-#
-#HES_OP_data %>% 
-#  write.csv("HES_OP_DIAG_23OCT24.csv")
-#
-#HES_OP_data%>% 
-#  count(PSEUDO_PAT)#n=XXX of 6536 
-#
-##Then merge the OP and APC data
-#all_hes_data<-rbind(HES_OP_data, HES_APC_data) %>% 
-# arrange(PSEUDO_PAT,DATAYEAR) %>% 
-#  ungroup()
-#
-#all_hes_data %>% 
-#  write_csv("all_hes_data_OP_and_APC.csv")
-```
 
 Read in HES data:
 ```{r}
@@ -1153,15 +933,25 @@ MICE must include the outcome as part of the imputation model.
 PS is now part of this model as per David's suggestion:
 Select variables for imputation:
 ```{r}
+#Assess missingness before imputation
+cohort %>%
+  skimr::skim() #PS, REGION/CENTRETYPE (1 missing), IMD2015_1 (99.1% complete), BMI missing, 
+
 imputationdataset <-cohort %>%
   mutate(BMI=as.numeric(BMI)) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(PSEUDO_PAT,modality, REGION, CENTRE_TYPE,ETHNICITYNAME,BMI,IMD2015_1,PS, AGECATEGORY,bevflag,STAGE_BEST_CLEAN, overall_survival, EVENT)
+  select(PSEUDO_PAT,modality, REGION, CENTRETYPE,ETHNICITYNAME,BMI,IMD2015_1,PS, AGECATEGORY,bevflag,STAGE_BEST_CLEAN, overall_survival, EVENT)
 
-imputationdataset %>% 
-  skimr::skim() #BMI 98.3% complete, PS 91.9% complete
+imputationdataset %>%
+  skimr::skim() #BMI 98.3% complete, PS 91.9% complete, IMD2015_1 0.99.1% complete, overall survival 99.9%
 
-#These data will be imputed to allow for improved survival analysis
+#Mutate IMD as numeric for imputation
+  imputationdataset<-imputationdataset %>% 
+  mutate(IMD2015_1=ifelse(str_detect(IMD2015_1,"1"),"1",IMD2015_1)) %>% 
+  mutate(IMD2015_1=ifelse(str_detect(IMD2015_1,"5"),"5",IMD2015_1)) %>% 
+  mutate(IMD2015_1=as.numeric(IMD2015_1))
+
+#IMD2015_1, PS and BMI data will be imputed to allow for improved survival analysis
 ```
 
 Multiple imputation of missing data:
@@ -1184,7 +974,7 @@ xyplot(tempData,~ PS,pch=18,cex=1) #this code shows the distribution of imputed 
 
 densityplot( x=tempData , data= tempData~BMI)#this code will plot a histogram of the imputed data against the observed data
 densityplot( x=tempData , data= tempData~PS)#this code will plot a histogram of the imputed data against the observed data
-
+densityplot( x=tempData , data= tempData~IMD2015_1)
 ```
 
 Relink ethnicity and IMD as some of these data were lost in linkage:
@@ -1211,7 +1001,7 @@ Rejoin to original table:
 Rename to completed dataset to cohort for analysis:
 ```{r}
 cohort<-cohort %>% 
-  select(-BMI,-PS)#Remove BMI and PS  from the cohort
+  select(-BMI,-PS,)#Remove BMI and PS  from the cohort
 
 cohort2<-completedData %>% 
   select(PSEUDO_PAT, BMI,PS) %>% #Link imputed BMI and PS values
@@ -1275,10 +1065,10 @@ cohort<-cohort3
 
 completecase<-cohort %>% 
   filter(!is.na(PS)) %>% 
- select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, `Commissioning region`, CENTRE_TYPE)
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE)
 
 cohort<-cohort %>% 
- select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY,  IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE)
   mutate(adjuvantbreak=as.numeric(adjuvantbreak)) %>% 
     mutate(AGE=as.numeric(AGE))
 
@@ -1299,7 +1089,7 @@ Outcome 1a: Comparison of median time from surgery to adjuvant chemotherapy by e
 ```{r}
 library(gtsummary)
 ethnicity<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
   tbl_summary(by="ETHNICITY2") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1310,7 +1100,7 @@ ethnicity%>%
   gt::gtsave("adjuvanttimebyethnicity.docx")
 
 ethnicity_CATEGORY<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
   tbl_summary(by="ethnicitygroup") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1324,7 +1114,7 @@ ethnicity_CATEGORY%>%
 Outcome 1b: Comparison of median time from surgery to adjuvant chemotherapy by age category:
 ```{r}
 age<-cohort %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
   tbl_summary(by="AGECATEGORY") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1339,7 +1129,7 @@ Outcome 1c: Comparison of median time from surgery to adjuvant chemotherapy by I
 ```{r}
 imd<-cohort %>% 
   ungroup() %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>%  
   tbl_summary(by="IMD2015_1") %>% 
   add_p() %>% 
   add_n() %>% 
@@ -1354,8 +1144,8 @@ Outcome 1d: Compare time to surgery by region:
 ```{r}
 region<-cohort %>% 
    ungroup() %>% 
- select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,bevflag,PS, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
-  tbl_summary(by=`Commissioning region`) %>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by=REGION) %>% 
   add_p() %>% 
   add_n() %>% 
   add_overall()
@@ -1373,7 +1163,7 @@ The exposure is adjuvant treatment time.
 Explanatory variables are AGE, BMI (binned), stage, ethnicity, region, centre type and comorbidity.
 ```{r}
 cohortsurvival<-cohort %>% 
-  rename(Region=`Commissioning region`) %>% 
+  rename(Region=REGION) %>% 
   mutate(bevflag=ifelse(is.na(bevflag),0,bevflag))
 
 
@@ -1400,12 +1190,16 @@ cohortsurvival$ETHNICITY2<- relevel(cohortsurvival$ETHNICITY2, ref = "White")
 cohortsurvival$ethnicitygroup<-as.factor(cohortsurvival$ethnicitygroup)
 
 cohortsurvival$ethnicitygroup<- relevel(cohortsurvival$ethnicitygroup, ref = "White")
+cohortsurvival$Region<-as.factor(cohortsurvival$Region)
+cohortsurvival$Region<- relevel(cohortsurvival$Region, ref = "LONDON COMMISSIONING REGION")
 
 cohortsurvival %>% 
   ungroup() %>% 
   skimr::skim()
 
-survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRE_TYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
+
+
+survival<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+ modality+ Region+ CENTRETYPE+ethnicitygroup+BMI2+IMD2015_1+ AGECATEGORY+bevflag+STAGE_BEST_CLEAN+PS,data=cohortsurvival)
 summary(survival)
 
 coxtable<-tbl_regression(survival, exponentiate = TRUE)%>% 
@@ -1532,6 +1326,9 @@ kmcurveplot_IDS
 ```
 Cox regression: 5 year OS for PDS only
 ```{r}
+pds_analysis$Region<-as.factor(pds_analysis$Region)
+pds_analysis$Region<- relevel(pds_analysis$Region,ref = "LONDON COMMISSIONING REGION")
+
 survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=pds_analysis)
 summary(survival_PDS)
 
@@ -1545,8 +1342,13 @@ coxtable_PDS_only%>%
 
 Cox regression: 5 year OS for IDS only
 ```{r}
+ids_analysis$Region<-as.factor(ids_analysis$Region)
+ids_analysis$Region<- relevel(ids_analysis$Region,ref = "LONDON COMMISSIONING REGION")
+
 survival_IDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+ AGECATEGORY +BMI2+bevflag+Region+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS,data=ids_analysis)
 summary(survival_IDS)
+
+
 
 coxtable_IDS_only<-tbl_regression(survival_IDS, exponentiate = TRUE)%>% 
   add_n() #Gtsummary table for Cox regression analysis
@@ -1567,12 +1369,11 @@ completecase$ethnicitygroup<- relevel(completecase$ethnicitygroup, ref = "White"
 ```
 
 
-Complete-case analysis Cox regression: 5 year OS for PDS only
+Complete-case analysis Cox regression: 5 year OS for PDS only.
+After imputation these are the same as the whole analysis:
 ```{r}
 complete_case_pds_analysis<-completecase %>% 
   filter(modality=="PDS")
-
-
 
 complete_case_pds_analysis$BMI2<- relevel(complete_case_pds_analysis$BMI2,ref = "[18.5,25)")
 complete_case_pds_analysis$`Commissioning region`<-as.factor(complete_case_pds_analysis$`Commissioning region`)
@@ -1581,7 +1382,7 @@ complete_case_pds_analysis$`Commissioning region`<- relevel(complete_case_pds_an
 
 
 survival_PDS<-coxph(Surv(overall_survival, EVENT) ~adjuvantbreakcategory+STAGE_BEST_CLEAN+PS+ AGECATEGORY +BMI2+bevflag+	
-`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1+PS2,data=complete_case_pds_analysis)
+`Commissioning region`+ CENTRE_TYPE+ethnicitygroup+IMD2015_1,data=complete_case_pds_analysis)
 summary(survival_PDS)
 
 coxtable_PDS_only<-tbl_regression(survival_PDS, exponentiate = TRUE)%>% 
