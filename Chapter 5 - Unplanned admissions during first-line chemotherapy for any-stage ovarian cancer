@@ -874,6 +874,8 @@ ethnicity<-tidy(ethnicity, exponentiate = TRUE, conf.int = TRUE)
 ethnicity %>% 
 write_csv("ETHNICITY ALL GROUPS_univariate.csv")
 
+regression_data2
+
 ethnicity<-lm(admission_within_30_days~ethnicitygroup,data=regression_data2,family="binomial")
 ethnicity<-tidy(ethnicity, exponentiate = TRUE, conf.int = TRUE)
 ethnicity %>% 
@@ -899,6 +901,11 @@ ps<-lm(admission_within_30_days~PS,data=regression_data2,family="binomial")
 ps<-tidy(ps, exponentiate = TRUE, conf.int = TRUE)
 ps %>% 
 write_csv("ps_univariate.csv")
+
+ps2<-lm(admission_within_30_days~PS2,data=regression_data2,family="binomial")
+ps2<-tidy(ps, exponentiate = TRUE, conf.int = TRUE)
+ps2 %>% 
+write_csv("ps_category_univariate.csv")
 
 bmi<-lm(admission_within_30_days~BMI2,data=regression_data2,family="binomial")
 bmi<-tidy(bmi, exponentiate = TRUE, conf.int = TRUE)
@@ -940,11 +947,14 @@ age_stage<-tidy(age_stage, exponentiate = TRUE, conf.int = TRUE)
 age_stage %>% 
  write_csv("age_stage_interaction_terms.csv")
 
+regression_data2$ethnicitygroup<-relevel(regression_data2$ethnicitygroup, ref = "White")
+
 ethnicity_stage<-lm(admission_within_30_days~STAGE_BEST_CLEAN*ethnicitygroup,data=regression_data2,family="binomial")
 ethnicity_stage<-tidy(ethnicity_stage, exponentiate = TRUE, conf.int = TRUE)
 ethnicity_stage %>% 
  write_csv("ethnicity_collapsed_stage_interaction_terms.csv")
 
+regression_data2$ETHNICITYNAME<-relevel(regression_data2$ETHNICITYNAME, ref = "White")
 
 ethnicity_stage<-lm(admission_within_30_days~STAGE_BEST_CLEAN*ETHNICITYNAME,data=regression_data2,family="binomial")
 ethnicity_stage<-tidy(ethnicity_stage, exponentiate = TRUE, conf.int = TRUE)
