@@ -1,5 +1,5 @@
 ---
-title: "PARPi version 2"
+title: "Risk of secondary myelodysplastic syndromes and acute myeloid leukaemia following poly(ADP-ribose) polymerase inhibitor treatment for advanced-stage recurrent ovarian cancer: A retrospective cohort study in England"
 author: "Luke Steventon"
 date: "`r Sys.Date()`"
 output:
@@ -42,6 +42,12 @@ treatments<-read_csv(
   col_types = cols(.default = col_character()),
   col_select = NULL)
 ```
+
+```{r}
+ovariancohort %>% 
+  skimr::skim()
+```
+
 
 n=23,774 ovarian cancer patients are represented in the NCRAS registry.
 n=1,697 received PARPi
@@ -1586,39 +1592,7 @@ regression_table %>%
   as_gt() %>% 
   gt::gtsave("oddsratios_parpi_aml.docx")
 ```
-As per David's comments, identify background rates of MDS/AML in the wider ovarian cancer population:
-```{r}
-#Filter for ovarian cancer patients:
-backgroundpopulation<-read_csv("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio\\PARPi Study 24JAN24\\ODR1920_080_AV_Tumour_2019Data_v2.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL) %>% 
-  mutate(ovarian_flag=ifelse(str_detect(SITE_ICD10_O2,"c48|c56|c57|C48|C56|C57"),1,NA)) %>% 
-  group_by(PSEUDO_PAT) %>% 
-  fill(ovarian_flag,.direction="updown") %>% 
-  filter(ovarian_flag==1)
 
-backgroundpopulation<-backgroundpopulation %>% 
-  select(PSEUDO_PAT, SITE_ICD10_O2, DIAGNOSISDATEBEST,ovarian_flag) %>% 
-  distinct(PSEUDO_PAT,SITE_ICD10_O2,.keep_all=T)
-
-NCRD_MDS_BACKGROUND<-backgroundpopulation %>% 
-  mutate(MDSAML=ifelse(str_detect(SITE_ICD10_O2,"d46|c92|d.46|c.92|D46|C92"),1,NA)) %>%
-  filter(ovarian_flag==1) %>% 
-  #filter(!is.na(MDSAML)) %>% 
-  select(PSEUDO_PAT,MDSAML,DIAGNOSISDATEBEST, SITE_ICD10_O2) %>% 
-  arrange(PSEUDO_PAT, DIAGNOSISDATEBEST) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  ungroup()
-
-NCRD_MDS_BACKGROUND %>% 
-  count(PSEUDO_PAT) #n=33,737 patients with any ovarian cancer diagnosis in NCRD
-
-NCRD_MDS_BACKGROUND %>% 
-  filter(str_detect(SITE_ICD10_O2, "C92|D46")) %>% #n=47 (0.14%) AML, 12 MDS (0.36%) of 33,373
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  count(SITE_ICD10_O2)
-```
 
 
 Describe median FU time:
@@ -1643,23 +1617,6 @@ analysiscohort %>%
 #                    NA's   :10
 #
 
-#For PARPi only
-analysiscohort %>% 
-  mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>%
- # mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE)) %>% 
-  select(PSEUDO_PAT, VITALSTATUSDATE, ADMINISTRATION_DATE,totalparptime) %>% 
-  mutate(FUtime=as.numeric(difftime(VITALSTATUSDATE,min(ADMINISTRATION_DATE),  units = "days"))) %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(PSEUDO_PAT,FUtime,totalparptime) %>% 
-  filter(!is.na(totalparptime)) %>% 
-  summary()
-#PSEUDO_PAT            FUtime     totalparptime     
-# Length:1024        Min.   :1125   Length:1024       
-# Class :character   1st Qu.:2454   Class :character  
-# Mode  :character   Median :2578   Mode  :character  
-#                    Mean   :2481                     
-#                    3rd Qu.:2579                     
-#                    Max.   :279
 #For chemo only
 analysiscohort %>% 
   mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>%
@@ -1678,7 +1635,26 @@ analysiscohort %>%
 #                    Mean   :1842                     
 #                    3rd Qu.:2578                     
 #                    Max.   :2792                     
-#                    NA's   :10         
+#                    NA's   :10    
+
+#For PARPi only
+analysiscohort %>% 
+  mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>%
+ # mutate(ADMINISTRATION_DATE=dmy(ADMINISTRATION_DATE)) %>% 
+  select(PSEUDO_PAT, VITALSTATUSDATE, ADMINISTRATION_DATE,totalparptime) %>% 
+  mutate(FUtime=as.numeric(difftime(VITALSTATUSDATE,min(ADMINISTRATION_DATE),  units = "days"))) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT,FUtime,totalparptime) %>% 
+  filter(!is.na(totalparptime)) %>% 
+  summary()
+#PSEUDO_PAT            FUtime     totalparptime     
+# Length:1024        Min.   :1125   Length:1024       
+# Class :character   1st Qu.:2454   Class :character  
+# Mode  :character   Median :2578   Mode  :character  
+#                    Mean   :2481                     
+#                    3rd Qu.:2579                     
+#                    Max.   :2798
+     
 ```
 
 Describe person-year time - the time spent on treatment in each treatment group for the study
@@ -1691,7 +1667,7 @@ person_year_time<-person_year_time%>% group_by(PSEUDO_PAT) %>%
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
   mutate(personyeartime=difftime(VITALSTATUSDATE,min(ADMINISTRATION_DATE), units = "days"))
 
-#Person-year time for whole cohort
+#Person-year time for whole cohort (any treatment)
 person_year_time %>%
   mutate(personyeartime=as.numeric(personyeartime)) %>% 
   summary()
@@ -1718,6 +1694,7 @@ person_year_time %>%
  #Max.   :2724.0  
  #NA's   :121
 
+#Chemo + PARPi
 person_year_time %>%
   filter(!is.na(totalparptime)) %>% 
   mutate(personyeartime=as.numeric(personyeartime)) %>% 
@@ -1740,7 +1717,7 @@ analysiscohort %>%
   select(totalparptime) %>%
   mutate(totalparptime=as.numeric(totalparptime)) %>% 
   summary()
-#median time on PARP was 191 days IQR 112, 365 days
+#median time on PARP was 191 days IQR 112, 365 days, range 35-1687
 ```
 
 Event rate in non-standard
@@ -1772,4 +1749,448 @@ analysiscohort %>%
   filter(is.na(standard_secondline)==1) %>% 
   count(MDS,AML) 
 #no events in patients treated with non-standard first line
+```
+
+As per David's comments, identify background rates of MDS/AML in the wider ovarian cancer population:
+```{r}
+#Filter for ovarian cancer patients:
+backgroundpopulation<-read_csv("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 4 - Data Linkage\\ovarian_cohort20NOV.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) %>% 
+  select(-SITE_ICD10_O2,-DIAGNOSISDATEBEST)
+
+treatment<-read_csv("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio\\PARPi Study 24JAN24\\ODR1920_080_AV_Tumour_2019Data_v2.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+
+backgroundpopulation<-treatment %>% 
+  merge(backgroundpopulation, by = "PSEUDO_PAT") %>% 
+  select(PSEUDO_PAT, SITE_ICD10_O2,DIAGNOSISDATEBEST)
+
+backgroundpopulation %>% 
+  count(PSEUDO_PAT) #n=23,774
+
+NCRD_MDS_BACKGROUND<-backgroundpopulation %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(MDSAML=ifelse(str_detect(SITE_ICD10_O2,"d46|c92|d.46|c.92|D46|C92"),1,NA)) %>%
+  fill(MDSAML,.direction="updown") %>% 
+  select(PSEUDO_PAT,MDSAML,DIAGNOSISDATEBEST, SITE_ICD10_O2) %>% 
+  arrange(PSEUDO_PAT, DIAGNOSISDATEBEST) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  ungroup()
+
+NCRD_MDS_BACKGROUND %>% 
+  count(PSEUDO_PAT) #n=23,774 patients with any ovarian cancer diagnosis in NCRD
+
+NCRD_MDS_BACKGROUND %>% 
+  filter(str_detect(SITE_ICD10_O2, "C92|D46")) %>% #n=24 (0.1%) AML, 6 MDS (0.03%) of 23,774
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(SITE_ICD10_O2)
+
+#Create  list of included patients:
+filterlist<-NCRD_MDS_BACKGROUND %>% 
+  distinct(PSEUDO_PAT)
+#Import HES APC records:
+HESDIAGNOSIS1<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG2122_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS2<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG2021_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS3<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1920_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS4<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1819_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS5<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1718_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS6<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1617_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS7<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1516_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS8<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1415_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS9<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1314_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS10<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1213_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS11<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1112_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESDIAGNOSIS12<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESAPC_DIAG1011_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+
+#Read HES APC files containing visit date details
+hesapc1<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\RStudio\\ODR1920_080_HESAPC_1619_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT") %>% 
+  select(PSEUDO_PAT, PSEUDO_EPIKEYANON, ADMIDATE,DATAYEAR)
+hesapc2<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\RStudio\\ODR1920_080_HESAPC_1013_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT") %>% 
+  select(PSEUDO_PAT, PSEUDO_EPIKEYANON, ADMIDATE,DATAYEAR)
+hesapc3<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\RStudio\\ODR1920_080_HESAPC_1316_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT") %>% 
+  select(PSEUDO_PAT, PSEUDO_EPIKEYANON, ADMIDATE,DATAYEAR)
+hesapc4<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\RStudio\\ODR1920_080_HESAPC_22_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT") %>% 
+  select(PSEUDO_PAT, PSEUDO_EPIKEYANON, ADMIDATE,DATAYEAR)
+#Bind HES APC files to get admission dates
+hes_acp_files<-rbind(hesapc1,hesapc2,hesapc3,hesapc4)
+
+#Import HES OP records
+HESOPDIAGNOSIS1<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG2122_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS2<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG2021_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS3<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1920_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS4<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1819_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS5<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1718_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) %>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS6<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1617_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS7<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1516_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS8<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1415_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS9<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1314_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS10<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1213_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS11<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1112_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+HESOPDIAGNOSIS12<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//HES data link//ODR1920_080_HESOP_DIAG1011_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+
+
+#Join HES APC data and write.csv
+HES_all_data_bind1<-rbind(HESDIAGNOSIS1,HESDIAGNOSIS2)
+HES_all_data_bind2<-rbind(HESDIAGNOSIS3,HESDIAGNOSIS4)
+HES_all_data_bind3<-rbind(HESDIAGNOSIS5,HESDIAGNOSIS6)
+HES_all_data_bind4<-rbind(HESDIAGNOSIS7,HESDIAGNOSIS8)
+HES_all_data_bind5<-rbind(HESDIAGNOSIS9,HESDIAGNOSIS10)
+HES_all_data_bind6<-rbind(HESDIAGNOSIS11,HESDIAGNOSIS12)
+HES_bind12<-rbind(HES_all_data_bind1,HES_all_data_bind2)
+HES_bind34<-rbind(HES_all_data_bind3,HES_all_data_bind4)
+HES_bind56<-rbind(HES_all_data_bind5,HES_all_data_bind6)
+HES_APC_data<-rbind(HES_bind12, HES_bind34,HES_bind56) %>% arrange(PSEUDO_PAT, DATAYEAR)
+HES_APC_data#n=XXXX, %% of total of 6,536 patients
+
+#Select columns
+HES_APC_data<-HES_APC_data%>% 
+  select(PSEUDO_PAT,PSEUDO_EPIKEYANON, DATAYEAR, DIAG4_01:DIAG4_12)
+
+#Merge with HES APC 
+hes_apc_final<-HES_APC_data %>% 
+  left_join(hes_acp_files, by = c("PSEUDO_PAT","DATAYEAR" ,"PSEUDO_EPIKEYANON"))
+
+
+
+HES_APC_data%>% 
+  count(PSEUDO_PAT)#n=10,922 of 10,940 (#99.8% represented)
+
+#Bind HES OP and write full file:
+HESOPDIAGNOSIS12<-rbind(HESOPDIAGNOSIS1,HESOPDIAGNOSIS2)
+HESOPDIAGNOSIS34<-rbind(HESOPDIAGNOSIS3,HESOPDIAGNOSIS4)
+HESOPDIAGNOSIS56<-rbind(HESOPDIAGNOSIS5,HESOPDIAGNOSIS6)
+HESOPDIAGNOSIS78<-rbind(HESOPDIAGNOSIS7,HESOPDIAGNOSIS8)
+HESOPDIAGNOSIS910<-rbind(HESOPDIAGNOSIS9,HESOPDIAGNOSIS10)
+HESOPDIAGNOSIS1112<-rbind(HESOPDIAGNOSIS11,HESOPDIAGNOSIS12)
+HES_apocoperbind12<-rbind(HESOPDIAGNOSIS12,HESOPDIAGNOSIS34)
+HES_apocoperbind34<-rbind(HESOPDIAGNOSIS56,HESOPDIAGNOSIS78)
+HES_apocoperbind56<-rbind(HESOPDIAGNOSIS910,HESOPDIAGNOSIS1112)
+HES_OP_data<-rbind(HES_apocoperbind12, HES_apocoperbind34,HES_apocoperbind56) %>% arrange(PSEUDO_PAT, DATAYEAR)
+rm(HES_apocoperbind12,HES_apocoperbind34,HES_apocoperbind56)
+rm(HESOPDIAGNOSIS1,HESOPDIAGNOSIS2,HESOPDIAGNOSIS3,HESOPDIAGNOSIS4,HESOPDIAGNOSIS5,HESOPDIAGNOSIS6,HESOPDIAGNOSIS7,HESOPDIAGOSIS8,HESOPDIAGNOSIS9,HESOPDIAGNOSIS10,HESOPDIAGNOSIS11,HESOPDIAGNOSIS12)
+
+HES_OP_data<-HES_OP_data%>% 
+  select(PSEUDO_PAT, DATAYEAR, DIAG4_01:DIAG4_12) %>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+
+
+HES_OP_data%>% 
+  count(PSEUDO_PAT)#n=10,922 of 10,940 represented
+
+
+#Study outcome:
+#Identify MDS/AML in the HES APC, OPC and A&E datasets
+
+hes_apc_final %>% 
+  count(PSEUDO_PAT) #N=10,922 of 10,940 patients in total in the HESAPC gynae data
+
+HESAPCMDS<- hes_apc_final %>% 
+  merge(filterlist, by ="PSEUDO_PAT")
+
+HESAPCMDS %>% 
+  count(PSEUDO_PAT) #n=10,922 patients of 10,940 have a record in the HES APC data
+
+HESAPCMDS<-HESAPCMDS %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_01,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,NA)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_02,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_03,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_04,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_05,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_06,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_07,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_08,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_09,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_10,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_11,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_12,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) 
+
+HESAPCMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #N=10 patients with a diagnosis of MDS or AML in the HES APC data
+
+
+#Identify MDS/AML diagnoses in the HES outpatient datasets:
+
+HES_OP_data %>% 
+  count(PSEUDO_PAT) #N=10,922 patients in total in the HESOPC gynae data
+
+HESOPCMDS<-HES_OP_data %>% 
+     merge(filterlist, by ="PSEUDO_PAT") %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_01,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,NA)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_02,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_03,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_04,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_05,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_06,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_07,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_08,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_09,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_10,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_11,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG4_12,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) 
+
+HESOPCMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT)#N=0 patients with a diagnosis of MDS or AML in the HES OPC data
+
+
+#Check for MDS/AML diagnoses in the HES A&E datasets:
+
+hes_ae<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Rstudio\\HES data link\\ODR1920_080_HESAE_DIAG_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)%>% 
+  merge(filterlist, by = "PSEUDO_PAT")
+
+
+hes_ae %>% 
+  count(PSEUDO_PAT) #N=8,130/10,940 patients in total in the HES A&E  data
+
+HESAEMDS<-hes_ae %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_01,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,NA)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_02,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_03,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_04,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_05,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_06,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_07,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_08,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_09,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+     mutate(MDSAML=ifelse(str_detect(DIAG_10,"d.46|c.92|D46|C920|C925|C926|C92A|C92Z|C929"),1,MDSAML)) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T)
+
+HESAEMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #N=0 patients with a diagnosis of MDS or AML in the HES A&E data
+
+
+#Then rbind the HES data together to generate one file with all the patients diagnosed with MDS AML.
+#This may need amending to align the columns:
+
+NCRD_MDS_LIST%>% 
+  mutate(MDSAML=1) %>% 
+  count(PSEUDO_PAT) #N=15 in the NCRD
+
+HESAPCMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #n=10 in the HES APC
+
+HESOPCMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #n=0 in the HES admitted patient care
+
+HESAEMDS %>% 
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #n=0 in the HES outpatient data
+
+
+#Organise the columns into similar terms so the data can be rbinded:
+HESAPCMDS<-HESAPCMDS %>% 
+  select(PSEUDO_PAT,ADMIDATE,DATAYEAR, DIAG4_01:DIAG4_12,MDSAML)
+
+HESOPCMDS<-HESOPCMDS %>% 
+  mutate(ADMIDATE=" ") %>% 
+  select(PSEUDO_PAT,ADMIDATE,DATAYEAR, DIAG4_01:DIAG4_12,MDSAML)
+  
+#NCRD_MDS_LIST<-NCRD_MDS_LIST %>% 
+ #mutate(MDSAML=1) %>% 
+ #mutate(ADMIDATE=dmy(DIAGNOSISDATEBEST)) %>% 
+ #mutate(DATAYEAR=" ") %>% 
+ #mutate(DIAG4_01=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_02=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_03=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_04=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_05=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_06=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_07=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_08=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_09=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_10=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_11=SITE_ICD10_O2) %>% 
+ #mutate(DIAG4_12=SITE_ICD10_O2) %>% 
+ #select(PSEUDO_PAT,ADMIDATE,DATAYEAR, DIAG4_01:DIAG4_12,  ,MDSAML)
+
+HESAPCMDS<-HESAPCMDS %>% 
+  mutate(ADMIDATE=dmy(ADMIDATE))
+
+allHESdata<-rbind(HESAPCMDS,NCRD_MDS_LIST)
+
+allHESdata<-allHESdata %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_01,"d.46|D46"),1,NA)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_02,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_03,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_04,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_05,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_06,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_07,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_08,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_09,"d.46|D46"),1,MDS)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_10,"d.46|D46"),1,MDS)) %>% 
+     mutate(AML=ifelse(str_detect(DIAG4_01,"C920|C925|C926|C92A|C92Z|C929"),1,NA)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_02,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_03,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_04,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_05,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_06,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_07,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_08,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_09,"C920|C925|C926|C92A|C92Z|C929"),1,AML)) %>% 
+     mutate(MDS=ifelse(str_detect(DIAG4_10,"C920|C925|C926|C92A|C92Z|C929"),1,AML))
+
+
+allHESdata %>%
+  filter(MDSAML==1) %>% 
+  count(PSEUDO_PAT) #N=41 / 23,774 cases of MDS/AML in the total cohort of ovarian patients treated with SACT (0.17% of total)
+
+allHESdata %>%
+  arrange(PSEUDO_PAT, ADMIDATE) %>% 
+  filter(MDSAML==1) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  count(MDS,AML)
 ```
