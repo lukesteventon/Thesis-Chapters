@@ -1,5 +1,5 @@
 ---
-title: "Study 1: Unplanned admissions for patients on bevacizumab or PARPi maintenance therapy
+title: "Study 1: Unplanned admissions for patients on first-line chemotherapy therapy
 author: "Luke Steventon"
 date: "`r Sys.Date()`"
 output: html_document
@@ -38,7 +38,7 @@ setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Un
 Load data.
 ```{r}
 cohort<-read_csv(
-  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Unplanned admissions during first-line chemotherapy\\ovarian_cohort20NOV.csv",
+ "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 4 - Data Linkage\\ovarian_cohort20NOV.csv",
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL)  #specified ovarian cancer cohort who received SACT for OC. Defined in Chapter 4 - Data Linkage.
@@ -77,6 +77,9 @@ HES_chemo %>%
   distinct(PSEUDO_PAT) %>% 
   merge(cohort,by="PSEUDO_PAT") %>% ##n=23,055 of 23,744 have a record in HES APC (97.1%)
   count(PSEUDO_PAT)
+
+cohort %>% 
+  skimr::skim()
 ```
 
 Initial check of data cleaning:
@@ -759,8 +762,6 @@ summarydata<-cohort_with_admission2 %>%
  cohort_with_admission2<-summarydata
 ```
 
-
-
 Data cleaning of variables for multivariable logistic regression:
 ```{r}
 #Define the outcome of 30 day admission
@@ -805,8 +806,6 @@ regression_data$PS2<-cut(regression_data$PS, breaks=c(0,1,2,10), right = FALSE)
 regression_data$BMI2<-cut(regression_data$BMI, breaks=c(0,18.5,25,30,40,99), right = FALSE)
 regimens<-regimens %>% 
   select(PSEUDO_PAT, regimen)
-
-
 ```
 
 
@@ -836,6 +835,8 @@ regression_data2$surgery<-relevel(regression_data2$surgery, ref = "PDS")
 regression_data2$BMI2<-as.factor(regression_data2$BMI2)
 regression_data2$BMI2<-relevel(regression_data2$BMI2, ref = "[18.5,25)")
 ```
+
+
 
 
 Univariable analysis to investigate association of factors with the outcome:
@@ -869,6 +870,8 @@ centretype_univariate<-tidy(centretype, exponentiate = TRUE, conf.int = TRUE)
 centretype_univariate %>% 
 write_csv("centretype_univariate.csv")
 
+regression_data2$ETHNICITYNAME<-as.factor(regression_data2$ETHNICITYNAME)
+regression_data2$ETHNICITYNAME<-relevel(regression_data2$ETHNICITYNAME, ref = "White")
 ethnicity<-lm(admission_within_30_days~ETHNICITYNAME,data=regression_data2,family="binomial")
 ethnicity<-tidy(ethnicity, exponentiate = TRUE, conf.int = TRUE)
 ethnicity %>% 
@@ -903,7 +906,7 @@ ps %>%
 write_csv("ps_univariate.csv")
 
 ps2<-lm(admission_within_30_days~PS2,data=regression_data2,family="binomial")
-ps2<-tidy(ps, exponentiate = TRUE, conf.int = TRUE)
+ps2<-tidy(ps2, exponentiate = TRUE, conf.int = TRUE)
 ps2 %>% 
 write_csv("ps_category_univariate.csv")
 
@@ -954,6 +957,7 @@ ethnicity_stage<-tidy(ethnicity_stage, exponentiate = TRUE, conf.int = TRUE)
 ethnicity_stage %>% 
  write_csv("ethnicity_collapsed_stage_interaction_terms.csv")
 
+regression_data2$ETHNICITYNAME<-as.factor(regression_data2$ETHNICITYNAME)
 regression_data2$ETHNICITYNAME<-relevel(regression_data2$ETHNICITYNAME, ref = "White")
 
 ethnicity_stage<-lm(admission_within_30_days~STAGE_BEST_CLEAN*ETHNICITYNAME,data=regression_data2,family="binomial")
@@ -967,25 +971,51 @@ STAGE_IMD %>%
  write_csv("STAGE_IMD_interaction_terms.csv")
 ```
 
-Outcome 2ai: Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
+Outcome 2ai: Complete-case analysis: N=12,087
+Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
 ```{r}
 regression_data2 %>% 
   skimr::skim()
 
 #Create logistic regression model 
-model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
+complete_case_analysis_model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
-summary(model) #n=12,088 patients included in logistic regression
+summary(complete_case_analysis_model) #n=12,088 patients included in logistic regression
 
 #Create summary table of odds ratios using exponentiated coefficients from glm above.
-regression_table<-tbl_regression(model, exponentiate = TRUE)
+regression_table<-tbl_regression(complete_case_analysis_model, exponentiate = TRUE)
 
 #Save output of logistic regression analysis
 regression_table %>% 
   as_gt() %>% 
-  gt::gtsave("oddsratios_firstlinechemo.docx")
+  gt::gtsave("oddsratios_firstlinechemo_complete_case_analysis.docx")
 ```
+
+Outcome 2ai: Multivariable logistic regression comparing admission within 30 days of starting first-line chemotherapy by demographic factors:
+This includes all patients but reomved IMD, REGION, CENTRE TYPE, GRADE, PS, BMI
+```{r}
+regression_data2 %>% 
+  skimr::skim()
+
+#Create logistic regression model 
+all_patients_model<-glm(admission_within_30_days~surgery+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+regimen+year_of_treatment,data=regression_data2,family="binomial")
+
+#Variables removed
+summary(all_patients_model) 
+
+#Summarise logistic regression
+summary(all_patients_model) #n=14,671 patients included in logistic regression
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+regression_table_all<-tbl_regression(all_patients_model, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+regression_table_all %>% 
+  as_gt() %>% 
+  gt::gtsave("oddsratios_firstlinechemo_all_patients.docx")
+```
+
 Outcome 2b: Run glm with ethnicity as white/non-white to check robustness of grouping these patients.
 ```{r}
 #Create logistic regression model 
@@ -1084,7 +1114,7 @@ regression_data2%>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
   mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,year_of_treatment,regimen) %>%
-  tbl_summary(by="admission_within_30_days") %>% 
+  tbl_summary(by="admission_within_30_days",percent="row") %>% 
   add_overall() %>% 
   add_ci() %>% 
   add_p() %>% 
@@ -1098,7 +1128,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
-   tbl_summary(by="IMD2015_1") %>% 
+   tbl_summary(by="IMD2015_1",percent="row") %>% 
    add_overall() %>% 
   add_ci() %>% 
   add_p() %>% 
@@ -1112,7 +1142,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
-  tbl_summary(by="ethnicitygroup") %>% 
+  tbl_summary(by="ethnicitygroup",percent="row") %>% 
   add_overall() %>% 
     add_ci() %>% 
 
@@ -1128,7 +1158,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
-   tbl_summary(by="ETHNICITY2") %>% 
+   tbl_summary(by="ETHNICITY2",percent="row") %>% 
    add_overall() %>% 
     add_ci() %>% 
 
