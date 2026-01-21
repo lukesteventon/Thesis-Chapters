@@ -265,31 +265,31 @@ trial_function<-function(sample_data){
   quantile(risk_curves_wider$hazard_ratio, c(0.05,0.95)) 
   
   #At 1 year
-  discontinuation_risk_12<-discontinuation_df2[discontinuation_df2$interval == 11,]$risk #11.08894 risk for early discontinuation
-  discontinuation_df2[discontinuation_df2$interval == 11,]$lowerci_risk #2.339781 LCI
-  discontinuation_df2[discontinuation_df2$interval == 11,]$upperci_risk#22.81026 UCI
+  discontinuation_risk_12<-discontinuation_df2[discontinuation_df2$interval == 11,]$risk #22.61 risk for early discontinuation
+  LCI_discontinuation_risk_12<-discontinuation_df2[discontinuation_df2$interval == 11,]$lowerci_risk #5.8 LCI
+  UCI_discontinuation_risk_12<-discontinuation_df2[discontinuation_df2$interval == 11,]$upperci_risk#42.7 UCI
   
-  continuation_risk_12<-completion_df2[completion_df2$interval == 11,]$risk #8.268269 risk for completion at 1 year
-  completion_df2[completion_df2$interval == 11,]$lowerci_risk #2.169762 LCI
-  completion_df2[completion_df2$interval == 11,]$upperci_risk#16.51437 UCI
+  continuation_risk_12<-completion_df2[completion_df2$interval == 11,]$risk #4.44 risk for completion at 1 year
+  LCI_continuation_risk_12<-completion_df2[completion_df2$interval == 11,]$lowerci_risk #1.08 LCI
+  UCI_continuation_risk_12<-completion_df2[completion_df2$interval == 11,]$upperci_risk#9.27 UCI
   
   #At 2 years
-  discontinuation_risk_24 <- discontinuation_df2[discontinuation_df2$interval == 23,]$risk #26.35727
-  discontinuation_df2[discontinuation_df2$interval == 23,]$lowerci_risk #6.457653 LCI
-  discontinuation_df2[discontinuation_df2$interval == 23,]$upperci_risk#50.13032 UCI
+  discontinuation_risk_24 <- discontinuation_df2[discontinuation_df2$interval == 23,]$risk #37.65
+  LCI_discontinuation_risk_24<-discontinuation_df2[discontinuation_df2$interval == 23,]$lowerci_risk #12.04 LCI
+  UCI_discontinuation_risk_24<-discontinuation_df2[discontinuation_df2$interval == 23,]$upperci_risk#62.4 UCI
   
-  continuation_risk_24 <- completion_df2[completion_df2$interval == 23,]$risk #21.13107% risk for completion
-  completion_df2[completion_df2$interval == 23,]$lowerci_risk #6.080551 LCI
-  completion_df2[completion_df2$interval == 23,]$upperci_risk#39.67215 UCI
+  continuation_risk_24 <- completion_df2[completion_df2$interval == 23,]$risk #16.4% risk for completion
+  LCI_continuation_risk_24<-completion_df2[completion_df2$interval == 23,]$lowerci_risk #4.6 LCI
+  UCI_continuation_risk_24<-completion_df2[completion_df2$interval == 23,]$upperci_risk#31.115 UCI
   
   #At 5 years
   discontinuation_risk_60 <- discontinuation_df2[discontinuation_df2$interval == 59,]$risk #42.61 risk
-  discontinuation_df2[discontinuation_df2$interval == 59,]$lowerci_risk #13.49438 LCI
-  discontinuation_df2[discontinuation_df2$interval == 59,]$upperci_risk#77.54737 UCI
+  LCI_discontinuation_risk_60<-discontinuation_df2[discontinuation_df2$interval == 59,]$lowerci_risk #23.73 LCI
+  UCI_discontinuation_risk_60<-discontinuation_df2[discontinuation_df2$interval == 59,]$upperci_risk#79.05 UCI
   
-  continuation_risk_60 <- completion_df2[completion_df2$interval == 59,]$risk #32.97
-  completion_df2[completion_df2$interval == 59,]$lowerci_risk #10.25 LCI
-  completion_df2[completion_df2$interval == 59,]$upperci_risk#60.07 UCI
+  continuation_risk_60 <- completion_df2[completion_df2$interval == 59,]$risk #40.5
+  LCI_continuation_risk_60<-completion_df2[completion_df2$interval == 59,]$lowerci_risk #15.54 LCI
+  UCI_continuation_risk_60<-completion_df2[completion_df2$interval == 59,]$upperci_risk#63.32 UCI
    
   #Calculate risk ratios and differences. This is required for the next stages and bootstrapping.
   risk_ratio_12 <- discontinuation_risk_12/continuation_risk_12
@@ -303,6 +303,18 @@ trial_function<-function(sample_data){
     estimate_hr = hazard_ratio_estimate,
     risk_ratio_12months = risk_ratio_12,
     risk_ratio_24months = risk_ratio_24,
+    LCI_discontinuation_risk_12,
+    UCI_discontinuation_risk_12,
+    LCI_continuation_risk_12,
+    UCI_continuation_risk_12,
+    LCI_discontinuation_risk_24,
+    UCI_discontinuation_risk_24,
+    LCI_continuation_risk_24,
+    UCI_continuation_risk_24,
+    LCI_discontinuation_risk_60,
+    UCI_discontinuation_risk_60,
+    LCI_continuation_risk_60,
+    UCI_continuation_risk_60,
     risk_ratio_60months = risk_ratio_60,
     risk_diff_12months = risk_diff_12,
     risk_diff_24months = risk_diff_24,
