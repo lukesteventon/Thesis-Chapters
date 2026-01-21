@@ -1,4 +1,5 @@
 library(tidyverse)
+library(data.table)
 setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 6  - Target trial emulation study")
 getwd()
 testdata<-read_csv("data_with_censoring.csv")
@@ -32,8 +33,8 @@ trial_function<-function(sample_data){
     filter(censor==0|(censor==1&lag(censor)==0)) #Censor patients when they deviate from the assigned treatment strategy
   #censor=0 means that the patient remains in the study
   
-  #sixcycles %>% 
-    #write_csv("check2.csv")
+  sixcycles %>% 
+    write_csv("check2.csv")
   sixcycles %>% count(ID)
   
   sixcycles$time_strategy<-paste(sixcycles$time,sixcycles$strategy)
@@ -43,8 +44,8 @@ trial_function<-function(sample_data){
     mutate(censor=as.numeric(ifelse(numberofcycles>5&interval>0,1,0))) %>% 
     filter((censor==0)|censor==1&lag(censor)==0) #Censor patients when they deviate from the assigned treatment strategy
   
-  #less_than_six_cycles %>% 
-    #write_csv("check3.csv")
+  less_than_six_cycles %>% 
+    write_csv("check3.csv")
   
   less_than_six_cycles%>% count(ID)
   
@@ -122,8 +123,9 @@ trial_function<-function(sample_data){
   #      1%      50%      75%      90%      95%      99%     100% 
   #XXX
   
-  #Create a new dataset containing data for all patients
-  combined_dataset<-rbind(less_than_six_cycles,sixcycles)
+  #Create a new dataset containing data for all patients. Exclude the rows where patients are censored - this should not be included in the follow-up period.
+  combined_dataset<-rbind(less_than_six_cycles,sixcycles) %>% 
+    filter(censor==0)
   
   #Convert columns to numerics to run glm
   combined_dataset<-combined_dataset %>% 
@@ -143,16 +145,10 @@ trial_function<-function(sample_data){
     mutate(time_strategy=as.factor(time_strategy)) %>% 
     mutate(strategy=ifelse(str_detect(strategy, "Discontinuation"), 0,1)) 
 
-  combined_dataset %>% 
-    count(survivalmarker)
-  
-  combined_dataset %>% 
-    count(strategy)
-  
   #Logistic regression for probability of surviving at each time point.
   #need to ensure that all variables are either numeric or factors - glm cant handle #characters
   survival_curve_model<-glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+maintenanceflag+
-                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "binomial")
+                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "quasibinomial")
   
   #Olivia code for survival analysis
   completion_df <- combined_dataset %>%
@@ -160,14 +156,14 @@ trial_function<-function(sample_data){
     dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,maintenanceflag,
                     REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
     filter(strategy==1) #Completion
-  
+
   discontinuation_df <- combined_dataset %>%
     mutate(row=interval) %>% 
     dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,maintenanceflag,
                   REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
     filter(strategy==0) #Discontinuation
   
-  # create hazards under each strategy
+  # create hazards under each strategy at each  interval
   completion_df$hazard1 <- predict(survival_curve_model, newdata=completion_df, type="response")
   discontinuation_df$hazard0 <- predict(survival_curve_model, newdata=discontinuation_df, type="response")
   
@@ -175,55 +171,29 @@ trial_function<-function(sample_data){
   discontinuation_df<-discontinuation_df %>%    
     group_by(ID) %>% 
     arrange(ID, time) %>% 
-    mutate(survival0 = 1-(cumprod(hazard0))) %>%
-    mutate(survival0*100) %>% 
+    mutate(risk0 = (1-hazard0)) %>%
+    mutate(survival_probability0=1-risk0) %>% 
     ungroup()
   
   discontinuation_df %>% 
-    select(survival0,hazard0)  %>% 
+    select(hazard0,survival_probability0, risk0)  %>% 
     summary()
   
   completion_df<-completion_df %>%    
     group_by(ID) %>% 
     arrange(ID, time) %>% 
-    mutate(survival1 = cumprod(hazard1)) %>%
-    mutate(survival1*100) %>% 
+    mutate(risk1 = (1-hazard1)) %>%
+    mutate(survival_probability1=1-risk1) %>% 
     ungroup()
-  
-  completion_df %>% 
-    select(survival1,hazard1)  %>% 
-    summary()
-  
-  # estimate risks as 1-survival
-  discontinuation_df <- discontinuation_df %>%
-    mutate(survival0 = (1-hazard0)) %>% 
-    mutate(risk0=(1-survival0)) %>% 
-    mutate(risk0=risk0*100) %>% 
-    mutate(survival0=survival0*100)
-  
-  discontinuation_df %>% 
-    select(survival0,risk0,hazard0)  %>% 
-    summary()
-  
-  completion_df <- completion_df %>%
-    mutate(survival1 = (1-hazard1)) %>% 
-    mutate(risk1=(1-survival1)) %>% 
-    mutate(risk1=risk1*100) %>% 
-    mutate(survival1=survival1*100)
-    #mutate(risk1=risk1*100)
 
-  completion_df %>% 
-    select(survival1,risk1,hazard1)  %>% 
-    summary()
-    
   # calculate mean for each time point
   discontinuation_df2 <- discontinuation_df %>%
     group_by(interval) %>%
     summarise(risk = mean(risk0),
-              survival = mean(survival0),
+              survival = mean(survival_probability0),
               hazard = mean(hazard0),
-              lower_ci=quantile(survival0,0.05),
-              upper_ci=quantile(survival0,0.95),
+              lower_ci=quantile(survival_probability0,0.05),
+              upper_ci=quantile(survival_probability0,0.95),
               lowerci_risk=quantile(risk0,0.05),
               upperci_risk=quantile(risk0,0.95)) %>% 
     mutate(strategy="Discontinuation")
@@ -235,10 +205,10 @@ trial_function<-function(sample_data){
   completion_df2 <- completion_df %>%
     group_by(interval) %>%
     summarise(risk = mean(risk1),
-              survival = mean(survival1),
+              survival = mean(survival_probability1),
               hazard = mean(hazard1),
-              lower_ci=quantile(survival1,0.05),
-              upper_ci=quantile(survival1,0.95),
+              lower_ci=quantile(survival_probability1,0.05),
+              upper_ci=quantile(survival_probability1,0.95),
               lowerci_risk=quantile(risk1,0.05),
               upperci_risk=quantile(risk1,0.95)) %>% 
     mutate(strategy="Completion")
@@ -252,20 +222,20 @@ trial_function<-function(sample_data){
     filter(strategy=="Discontinuation")
   completion<-completion_df2 %>% 
     filter(strategy=="Completion")
-  mean(discontinuation$survival) #60.82
-  mean(discontinuation$lower_ci) #39
-  mean(discontinuation$upper_ci) #85.6
-  mean(discontinuation$risk) #39.17
-  mean(discontinuation$lowerci_risk) #14.4
-  mean(discontinuation$upperci_risk) #60.91
+  mean(discontinuation$survival) #0.6083858
+  mean(discontinuation$lower_ci) #0.3909705
+  mean(discontinuation$upper_ci) #0.8559938
+  mean(discontinuation$risk) #0.3916142
+  mean(discontinuation$lowerci_risk) #0.1440062
+  mean(discontinuation$upperci_risk) #0.6090295
   
 #Estimates for completion arms  
-  mean(completion$survival) #78
-  mean(completion$lower_ci) #63.35
-  mean(completion$upper_ci) #92.81
-  mean(completion$risk) #21.44
-  mean(completion$lowerci_risk) #7.18
-  mean(completion$upperci_risk)#36.64
+  mean(completion$survival) #0.7858685
+  mean(completion$lower_ci) #0.6338571
+  mean(completion$upper_ci) #0.9281912
+  mean(completion$risk) # 0.2141315
+  mean(completion$lowerci_risk) #0.07180877
+  mean(completion$upperci_risk) #0.3661429
   
   discontinuation_df2<-discontinuation_df2 %>% 
     arrange(risk) %>% 
@@ -285,12 +255,13 @@ trial_function<-function(sample_data){
       values_from = c(risk, hazard, survival),
       names_sep = "_"
     )
-  
+
   # this is taken from the supplement of https://www.bmj.com/content/375/bmj-2021-066306/related#datasupp
   risk_curves_wider <- risk_curves_wider %>%
-    mutate(hazard_ratio = log(risk_Discontinuation)/log(risk_Completion))
+    mutate(hazard_ratio = log((risk_Discontinuation/risk_Completion)))
+  
   #hazard ratio is average of hazard ratios over time
-  hazard_ratio_estimate <- mean(risk_curves_wider$hazard_ratio) #1.117 (59% CI 1.024737 1.305902)
+  hazard_ratio_estimate <- mean(risk_curves_wider$hazard_ratio) #1.221 (59% CI 0.353222, 3.130218 )
   quantile(risk_curves_wider$hazard_ratio, c(0.05,0.95)) 
   
   #At 1 year
@@ -319,8 +290,7 @@ trial_function<-function(sample_data){
   continuation_risk_60 <- completion_df2[completion_df2$interval == 59,]$risk #32.97
   completion_df2[completion_df2$interval == 59,]$lowerci_risk #10.25 LCI
   completion_df2[completion_df2$interval == 59,]$upperci_risk#60.07 UCI
-  
-  
+   
   #Calculate risk ratios and differences. This is required for the next stages and bootstrapping.
   risk_ratio_12 <- discontinuation_risk_12/continuation_risk_12
   risk_diff_12 <- discontinuation_risk_12-continuation_risk_12
@@ -354,7 +324,7 @@ point_estimate<-trial_function(testdata)
 
 # then the bootstrap code is as follows
 
-n_boot <- 3
+n_boot <- 2
 
 # create an empty dataframe for each outcome/trial you are interested in
 survival_bootstrapped_estimates <- data.frame()
@@ -363,7 +333,6 @@ survival_bootstrapped_estimates <- data.frame()
 df_split <- split(testdata, testdata$ID)
 patids <- names(df_split)
 n_patients <- length(patids)
-set.seed(101)
 
 #Works up to here 
 for (i in 1:n_boot){
@@ -389,5 +358,5 @@ for (i in 1:n_boot){
          "bootstrapped results.csv", row.names=FALSE)
   gc()
 }
-getwd()
-```
+
+
