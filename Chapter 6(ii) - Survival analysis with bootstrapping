@@ -330,7 +330,7 @@ trial_function<-function(sample_data){
 #point_estimate<-trial_function(sample_data)
 
 # then the bootstrap code is as follows
-n_boot <- 2
+n_boot <- 1000
 # create an empty dataframe for each outcome/trial you are interested in
 survival_bootstrapped_estimates <- data.frame()
 
