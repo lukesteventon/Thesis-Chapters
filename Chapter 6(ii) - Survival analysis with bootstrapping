@@ -21,7 +21,10 @@ testdata<-testdata %>%
   rename(maxcycle=maxcycles)
 
 testdata %>% 
-  count(ID) #n=2,261
+  count(ID) #n=2,260
+
+testdata %>% 
+  skimr::skim()
 
 #This section defines the trial function as the application of censoring, IPCW weighting and survival model. This will be defined and repeated via bootstrapping.
 trial_function<-function(sample_data){
@@ -59,8 +62,8 @@ trial_function<-function(sample_data){
   #sixcycles$probability_of_uncensoring<-glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles$probability_of_uncensoring)
   
   #This logistic regression produces coefficients for covariates and the probabilty of remaining uncensored (i.e. remaining in the study)
-  probability_of_uncensoring_sixcycles<-glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-                                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles)
+  probability_of_uncensoring_sixcycles<-suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
+                                                               REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles))
   
   sixcycles <- sixcycles %>% 
     mutate(p1=predict(probability_of_uncensoring_sixcycles, type = "response")) #This line creates a new column with 
@@ -89,10 +92,15 @@ trial_function<-function(sample_data){
   #Weights after truncation
   quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
   #      1%      50%      75%      90%      95%      99%     100% 
-  #XXX
+  
+  sixcycles %>% 
+    filter(is.na(survivalmarker)) %>% 
+    summary()
+  
+  
   #Logistic regression for probability of remaining uncensored at each time point
-  probability_of_uncensoring_lessthansixcycles <- glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-                                                        REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles)
+  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
+                                                                         REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
   
   less_than_six_cycles<-less_than_six_cycles %>% 
     mutate(p1=predict(probability_of_uncensoring_lessthansixcycles, type = "response")) #This line creates a new column with 
@@ -147,8 +155,8 @@ trial_function<-function(sample_data){
   
   #Logistic regression for probability of surviving at each time point.
   #need to ensure that all variables are either numeric or factors - glm cant handle #characters
-  survival_curve_model<-glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+maintenanceflag+
-                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "binomial")
+  survival_curve_model<-suppressWarnings(glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+maintenanceflag+
+                                               REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "binomial"))
   
   #Olivia code for survival analysis
   completion_df <- combined_dataset %>%
