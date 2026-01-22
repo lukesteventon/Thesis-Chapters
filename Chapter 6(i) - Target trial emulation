@@ -947,9 +947,22 @@ cohort<-cohort %>%
   ungroup()
 ```
 
+Filter out patients with missing NA
+```{r}
+cohort %>% 
+  count(PSEUDO_PAT)
+
+cohort<-cohort %>% 
+  filter(!is.na(VITALSTATUSDATE))
+
+cohort %>% 
+  count(PSEUDO_PAT)
+```
+
+
 ```{r}
 cohort %>%
-  count(PSEUDO_PAT) #n=2,621 primary surgery only
+  count(PSEUDO_PAT) #n=2,620 primary surgery only
 
 cohort %>% 
   group_by(PSEUDO_PAT) %>% 
@@ -1124,6 +1137,60 @@ kmcurveplot_PDS<-ggsurvplot(kmcurvePDS,
 
 kmcurveplot_PDS
 ```
+
+```{r}
+
+baseline_characteristics<-cohort
+
+ccw_data<-cohort %>% 
+  distinct(PSEUDO_PAT, CYCLE_NUMBER,.keep_all=T) 
+
+pivottable<-ccw_data %>% 
+  select(PSEUDO_PAT,CYCLE_NUMBER, ADMINISTRATION_DATE) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  distinct(PSEUDO_PAT, CYCLE_NUMBER,.keep_all=T)
+
+pivottable %>% 
+  count(PSEUDO_PAT)#n=2621 patients who had PDS withins 180 days and included
+
+survival<-baseline_characteristics %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(VITALSTATUSDATE=as.Date(VITALSTATUSDATE)) %>% 
+  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
+  mutate(survivaltime=as.numeric(difftime(VITALSTATUSDATE, min(ADMINISTRATION_DATE), units = "days"))) %>% 
+  mutate(event=ifelse(survivaltime<1825&VITALSTATUS=="D",1,0)) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(survivaltime=ifelse(is.na(survivaltime),1825,survivaltime)) %>% 
+  mutate(event=ifelse(is.na(event),0,event)) %>% 
+  mutate(strategy=ifelse(total_cycles<6,"Discontinuation", "Completion")) %>% 
+  ungroup
+
+survival %>% 
+  select(survivaltime,event) %>% 
+  summary()
+
+kmcurvePDS<-survfit(Surv(survivaltime, event)~regimen, survival)
+
+
+kmcurveplot_PDS<-ggsurvplot(kmcurvePDS,
+           pval=F,
+           conf.int=TRUE,
+           conf.int.style="step",
+           xlab="Time in years",
+           xlim=c(0,1825),
+           break.time.by=365,
+           ggtheme=theme_minimal(),
+           risk.table="absolute",
+           risk.table.title="Number at risk",
+           risk.table.height=0.3,
+           risk.table.y.text.col=F,
+           risk.table.y.text=F,
+           ncensor.plot=FALSE,srv.median.line="hv",
+           legend.labs=c("doublet","single"))
+
+kmcurveplot_PDS
+```
+
 
 Read in interval table
 
@@ -1775,6 +1842,29 @@ data_with_censoring$time_strategy<-paste(data_with_censoring$time,data_with_cens
 
 data_with_censoring$timesq_strategy<-paste(data_with_censoring$timesq,data_with_censoring$strategy)
 ```
+
+Data correction: if patients discontinue in the first interval, values are listed as NA. This is corrected to 1 to allow for the one month grace period:
+```{r}
+data_with_censoring %>% 
+  filter(is.na(discontinuation)) %>% 
+  count(PSEUDO_PAT) #n=39 where only cycles are given in the first month. these patients have cycle 2 assigned as their discontinuation cycle
+
+data_with_censoring<-data_with_censoring %>% 
+  mutate(discontinuation=ifelse(is.na(discontinuation),1,discontinuation)) 
+
+data_with_censoring %>% 
+  filter(is.na(discontinuation)) %>% 
+  count(PSEUDO_PAT) #no patients with missing discontinuation
+
+data_with_censoring<-data_with_censoring %>% 
+  mutate(discontinuationinterval=ifelse(is.na(discontinuationinterval),"interval1",discontinuationinterval)) #n=39 where only cycles are given in the first month. these patients have cycle 2 assigned as their discontinuation cycle
+
+data_with_censoring %>% 
+  filter(is.na(discontinuation)) %>% 
+  count(PSEUDO_PAT) #no patients with missing discontinuation
+```
+
+Check discontinuation is assigned correctly
 Write csv file
 ```{r}
 data_with_censoring %>%
@@ -2223,8 +2313,6 @@ Calculate risk ratios and differences
    )
    rownames(risk_df) <- NULL
    
-risk_df %>% 
-  write_csv("early_dis_results.csv")
   
 ```
 
@@ -2255,560 +2343,23 @@ risk_curves_plot<-risk_curves %>%
 
 
 
-Bootstrapping- this is needed to run multiple analyses as the confidence intervals are very wide when we run this on only one dataset.
+Bootstrapping will be performed in a separate file:. See Pt2.
+
+Bootstrapping code:
 ```{r}
-fedsafdsafdsa
-#combined_dataset %>% 
-#  select(ID,interval, numberofcycles, survivalmarker, discontinuation, strategy, maxcycles, discontinuationinterval,censor, row, time, timesq, time_strategy, timesq_strategy,p1,cumulative_probability_uncensored,IPCW) %>% 
-#write_csv("bootstrappingdataset.csv")
-
-#combined_dataset<-read_csv(
-#  "bootstrappingdataset.csv",
- # col_names = TRUE,
- # col_types = cols(.default = col_character()),
- # col_select = NULL) 
-
-# firstly I have a function for the trials that return this table with all
-# of the metrics I am interested in
-trial_function <- function(data) {
-  
-six_cycles<-data %>% 
-  mutate(strategy=1) #Assign 1 to "full treatment of 6 cycles
-less_than_six_cycles<-data %>% 
-  mutate(strategy=0) #Assign 0 to "treatment with <6 cycles
-
-cloned_dataset<-rbind(six_cycles, less_than_six_cycles)
-
-
-cloned_dataset %>% 
-  arrange(ID, strategy) %>% 
-  select(ID, strategy, discontinuation, interval,numberofcycles)
-
-cloned_dataset<-cloned_dataset %>%
-  #ungroup() %>% 
-  #mutate(discontinuation=ifelse(discontinuation==0&lag(discontinuation==1),1,discontinuation)) %>% #Adjusts discontinuation cycle to the next interval where the final cycle is given
-  group_by(ID) %>% 
-  #filter(discontinuation==1) %>% #Keep all intervals from the point of treatment discontinuation
-  #distinct(ID,.keep_all=T) %>% #Keep the first interval where treatment was discontinued
-  mutate(maxcycles=max(numberofcycles)) %>% 
-  mutate(discontinuationinterval=ifelse(numberofcycles==maxcycles&discontinuation==1,interval,NA)) 
-
-
-cloned_dataset %>% 
-  arrange(ID, strategy) %>% 
-  select(ID, strategy, discontinuation, interval,numberofcycles)
-
-#Apply the grace period change where patients die in the same month as treatment discontinuation
-cloned_dataset<-cloned_dataset %>%
-    group_by(ID) %>% 
- fill(discontinuationinterval,.direction="updown") %>% 
- mutate(graceperiodchange=ifelse(survivalmarker==0&discontinuation==1,1,NA)) %>% #If the patient dies in the same interval as treatment discontinuation, change discontinuation to the next interval. This reduces the bias arising from the association of death with treatment discontinuation
-  filter(graceperiodchange==1) %>% #Keep only patients who die in the same interval as discontinuation (n=19 in this case)
-  select(ID, graceperiodchange, interval) %>% #Keep relevant columns
-  right_join(cloned_dataset, by = c("ID", "interval")) %>% #Merge to the original CCW dataset
-  #filter(graceperiodchange==1) %>% 
-  mutate(discontinuation=ifelse(!is.na(graceperiodchange),0,discontinuation)) %>% #If the grace period is flagged, mutate discontinuation to 0 so that the next interval becomes the discontinuation interval for that patient
-  select(-graceperiodchange) %>% 
-  arrange(ID, strategy, numberofcycles) %>% 
-  ungroup()
-
-data_with_censoring<-cloned_dataset %>% 
-  mutate(numberofcycles=as.numeric(numberofcycles)) %>% 
-  mutate(strategy=as.numeric(strategy)) %>% 
-  mutate(discontinuation=as.numeric(discontinuation)) %>% 
-  #group_by(ID) %>% 
-  ungroup() %>% 
-  mutate(censor=ifelse(strategy==1&discontinuation==1&maxcycles<6&numberofcycles==maxcycles,1,NA)) %>% 
-  mutate(censor=ifelse(strategy==0&discontinuation==1&maxcycles>5&numberofcycles==maxcycles,1,censor)) %>% 
-  group_by(ID, strategy) %>% 
-  arrange(ID, strategy, numberofcycles) %>% 
-  fill(censor, .direction="down") %>% 
-  mutate(censor=ifelse(is.na(censor),0,censor)) %>% 
-  group_by(ID) %>% 
-  fill(discontinuationinterval,.direction="updown") %>% 
-  ungroup()
-
-censoring<-IDS %>% 
-  distinct(ID,PSEUDO_PAT) %>% #id list
-  merge(censoring,by="PSEUDO_PAT")#list of censor dates when lost to FU
-
-data_with_censoring<-data_with_censoring %>% 
-  group_by(ID, strategy) %>% 
-  mutate(row=row_number()) %>% 
-  ungroup()
-
-#data_with_censoring<-censoring %>% 
-#  distinct(ID, censorinterval) %>% 
-#  filter(!is.na(censorinterval)) %>% 
-#  rename(interval=censorinterval) %>% 
-#  mutate(flag=1) %>% #create flag for censoring due to lost to FU
-#right_join(data_with_censoring, by = c("ID","interval")) %>% #merge with data to right-censor patients
-#  group_by(ID,strategy) %>% 
-#  arrange(ID,strategy,row) %>% 
-#  fill(flag,.direction = "down") %>% 
-#  mutate(censor=ifelse(!is.na(flag),1,censor)) #%>% #if lost to follow up, censor patient at that interval
-# # select(-censor_lost_to_fu,-censorinterval)
-
-data_with_censoring 
-
-
-data_with_censoring<-data_with_censoring %>% 
-  mutate(time=interval)
-
-data_with_censoring$time<-str_replace(data_with_censoring$time, "interval", "")
-
-data_with_censoring<-data_with_censoring %>% 
-  mutate(time=as.numeric(time))
-
-
-
-data_with_censoring<-IDS %>% 
-  merge(maintenanceflagtable, by= "PSEUDO_PAT") %>% 
-  right_join(data_with_censoring, by = "ID")
-
-data_with_censoring<-data_with_censoring%>% 
-  mutate(maintenanceflag=ifelse(is.na(maintenanceflag),0,maintenanceflag))
-
-data_with_censoring%>% 
-  distinct(ID,.keep_all=T) %>% #n=445 had maintenance therapy, 1837 did not
-  count(maintenanceflag)
-
-data_with_censoring<-grade %>% 
-  distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  merge(data_with_censoring, by = "PSEUDO_PAT") 
-
-
-data_with_censoring<-data_with_censoring %>% 
-  ungroup() %>% 
-  mutate(censor=ifelse(survivalmarker==0,1,censor))
-
-data_with_censoring<-data_with_censoring %>% 
-  mutate(ETHNICITY2=ifelse(str_detect(ETHNICITY, "White"),"White","Non-white"))
-
-
-data_with_censoring %>% 
-  count(ID) #N=2278
-
-data_with_censoring<-data_with_censoring %>% 
-  filter(interval!="interval60")
-
-#Create interaction terms
-data_with_censoring<-data_with_censoring %>% 
-  mutate(strategy=if_else(strategy==0,"Discontinuation","Completion")) %>% 
-  mutate(timesq=time*time) %>% 
-  mutate(time=as.character(time)) %>% 
-  mutate(timesq=as.character(timesq)) 
-
-data_with_censoring$time_strategy<-paste(data_with_censoring$time,data_with_censoring$strategy)
-
-data_with_censoring$timesq_strategy<-paste(data_with_censoring$timesq,data_with_censoring$strategy)
-
-
-data_with_censoring<-read_csv(
-  "data_with_censoring.csv",
-  col_names = TRUE,
-  col_types = cols(.default = col_character()),
-  col_select = NULL)
-
-#Recode numerical variables
-data_with_censoring2<-data_with_censoring %>% 
-    mutate(BMI=as.numeric(BMI)) %>% 
-    mutate(AGE=as.numeric(AGE)) %>% 
-    mutate(time=as.numeric(time)) %>% 
-    mutate(timesq=as.numeric(timesq)) %>% 
-    mutate(censor=as.numeric(censor))
-
-sixcycles<-data_with_censoring2 %>% 
-  filter(strategy=="Completion") %>% 
-  filter((censor==0)|censor==1&lag(censor)==0)
-
-sixcycles %>% 
-  count(ID)
-
-less_than_six_cycles<-data_with_censoring2 %>% 
-  filter(strategy=="Discontinuation") %>% 
-   filter((censor==0)|censor==1&lag(censor)==0)
-
-less_than_six_cycles %>% 
-  count(ID)#n=2933
-
-library(parsnip)
-#Logistic regression for probability of remaining uncensored at each time point
-probability_of_uncensoring<- glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles)
-
-summary(probability_of_uncensoring)
-sixcycles<-sixcycles %>% 
-  mutate(p1=predict(probability_of_uncensoring, type = "response")) #This line creates a new column with probability of being uncensored at each time point
-        
-         
-sixcycles<-sixcycles %>% #This calculates the cumulative probability of being uncensored at each timepoint
-  group_by(ID) %>% 
-  mutate(cumulative_probability_uncensored=cumprod(p1)) %>% 
-  ungroup()
-
-
-sixcycles<-sixcycles %>%#Calculate IPCW as 1/probability of being uncensored
- mutate(IPCW=(1/cumulative_probability_uncensored))
-
-sixcycles %>%
-  select(IPCW) %>% 
-  summary()
-
-sixcycles %>%
-  select(IPCW) %>% 
-  arrange(desc(IPCW))
-
-quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-
-#Weights before truncation
-#        1%        50%        75%        90%        95%        99%       100% 
-#  1.006421   1.423722   1.944180   2.999650   4.153169   8.472784 102.285030  
-
-#Truncate IPCWs greater than the 99th percentile.
-sixcycles<-sixcycles %>%
-  mutate(IPCW=ifelse(IPCW>=8.472784 ,8.472784 ,IPCW))
-
-#Weights after truncation
-quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-#      1%      50%      75%      90%      95%      99%     100% 
-#1.006421 1.423722 1.944180 2.999650 4.153169 8.472755 8.472784
-
-sixcycles %>%
-  filter(censor==1) %>% count(ID) #n=1330/2933 patients are censored in the full treatment arm
-
-#Then set weights to the value of IPCW whne the sixth cycle is given. This is as per Chengsheng's methodology
-#sixcycles<-sixcycles %>%
-#  group_by(ID) %>% 
-#  mutate(IPCW_adjusted=ifelse(numberofcycles=="6"&discontinuation=="1"&lead(discontinuation=="0"),IPCW,NA)) %>% 
-#  fill(IPCW_adjusted, .direction = "updown") %>% 
-#  mutate(IPCW=ifelse(!is.na(IPCW_adjusted),IPCW_adjusted,IPCW)) %>% 
-#  select(-IPCW_adjusted)
-#  select(ID, IPCW, IPCW_adjusted,numberofcycles,discontinuation,interval)
-
-#Logistic regression for probability of remaining uncensored at each time point
-probability_of_uncensoring<- glm(censor==0~time+timesq+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles)
-
-summary(probability_of_uncensoring)
-less_than_six_cycles<-less_than_six_cycles %>% 
-  mutate(p1=predict(probability_of_uncensoring, type = "response")) #This line creates a new column with probability of being uncensored at each time point
-        
-         
-less_than_six_cycles<-less_than_six_cycles %>% #This calculates the cumulative probability of being uncensored at each timepoint
-  group_by(ID) %>% 
-  mutate(cumulative_probability_uncensored=cumprod(p1)) %>% 
-  ungroup()
-
-
-
-less_than_six_cycles<-less_than_six_cycles %>%#Calculate IPCW as 1/probability of being uncensored
- mutate(IPCW=(1/cumulative_probability_uncensored))
-
-less_than_six_cycles %>%
-  select(IPCW) %>% 
-  summary()
-
-less_than_six_cycles %>%
-  select(IPCW) %>% 
-  arrange(desc(IPCW))
-
-#As Per Chengsheng's method, keep weight as 1 before censoring, and keep the weight value at discontinuation
-
-quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-
-#Weights before truncation
-#          1%          50%          75%          90%          95%          99%         100% 
-#1.000000e+00 5.776079e+00 1.112096e+02 1.565994e+03 1.146095e+04 6.585397e+05 1.005740e+0
-
-#Truncate IPCWs greater than the 99th percentile.
-less_than_six_cycles<-less_than_six_cycles %>%
-  mutate(IPCW=ifelse(IPCW>=60.585397,60.585397,IPCW))
-
-#Weights after truncation
-quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-#      1%       50%       75%       90%       95%       99%      100% 
-# 1.000000  5.776079 60.585397 60.585397 60.585397 60.585397 60.585397
-
-less_than_six_cycles %>%
-  filter(censor==1) %>% 
-  count(ID) #n=2732/2933 patients are censored in the early discontination
-
-#Then set weights to the value of IPCW whne the sixth cycle is given. This is as per Chengsheng's methodology
-#less_than_six_cycles<-less_than_six_cycles %>%
-#  group_by(ID) %>% 
-#  mutate(IPCW_adjusted=ifelse(discontinuation=="1"&lead(discontinuation=="0"),IPCW,NA)) %>% 
-#  fill(IPCW_adjusted, .direction = "updown") %>% 
-#  mutate(IPCW=ifelse(!is.na(IPCW_adjusted),IPCW_adjusted,IPCW)) %>% 
-#  select(-IPCW_adjusted)
-
-
-combined_dataset<-rbind(less_than_six_cycles,sixcycles)
-
-
-
-
-library(cobalt)
-loveplotdata<-cohort %>% 
-  mutate(AGE=as.numeric(AGE)) %>% 
-  mutate(BMI=as.numeric(BMI)) %>% 
- rename("Index of multiple deprivation"=DEPRIVATION) %>% 
- rename("Body mass index"=BMI) %>% 
- rename("Age"=AGE) %>% 
- #rename("Regimen"=REGIMEN) %>% 
- rename("Cancer stage"=STAGE) %>% 
- rename("Ethnicity"=ETHNICITY2) %>% 
- rename("Centre type"=TREATINGCENTRETYPE) %>% 
- #rename("Comorbidity"=COMORBIDITY) %>% 
- rename("Region"=REGION) %>% 
- #rename('Grade'=GRADE) %>% 
-  rename("Year of treatment"=yearoftreatment) %>% 
- rename("Maintenance therapy"=maintenanceflag) %>% 
- select(Age, 'Cancer stage',"Maintenance therapy", "Body mass index", "Index of multiple deprivation","Year of treatment", Ethnicity, 'Centre type', Region,IPCW,strategy) %>% 
-  mutate(IPCW=as.numeric(IPCW)) 
-
-PLOT<-bal.tab(strategy
- ~ Age +`Cancer stage`+ `Maintenance therapy`+ `Body mass index`+ `Index of multiple deprivation`+ `Year of treatment`+Ethnicity+ `Centre type`+ Region , data = loveplotdata,
-        weights = "IPCW",
-        disp = c("means", "sdm"), un = TRUE, 
-        stats = c("mean.diffs"))
-
-PLOT
-
-
-#library(MatchIt)
-covariate_balance<-love.plot(PLOT, binary = "std", thresholds = c(m =-0.1, 0.1))
-
-covariate_balance
-
-
-
-#Olivia code- only keep uncensored rows
-    combined_data <- cohort %>%
-    filter(censor == 0|censor==1&lag(censor==0))
-
-
-combined_dataset<-combined_data %>% 
-  mutate(AGE=as.numeric(AGE)) %>% 
-  mutate(time=as.numeric(time)) %>% 
-  mutate(timesq=as.numeric(timesq)) %>% 
-  mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(IPCW=as.numeric(IPCW)) %>% 
-  mutate(survivalmarker=as.numeric(survivalmarker)) %>% 
-  mutate(censor=as.numeric(censor))
-
-
-#Logistic regression for probability of surviving at each time point
-survival_curve_model<-glm(survivalmarker~time+timesq+strategy+BMI+
-+REGION+TREATINGCENTRETYPE+ETHNICITY2+AGE+STAGE+DEPRIVATION+maintenanceflag+yearoftreatment,data=combined_dataset, weights=IPCW,family = "quasibinomial"())
-
-combined_dataset %>% 
-  distinct(PSEUDO_PAT,survivalmarker) %>% 
-  count(survivalmarker)#n=1153/2933 patients die within 5 years (37%) which makes sense for this cohort
-
-
-#Olivia
-completion_df <- combined_dataset %>%
-      dplyr::select(ID,time,timesq,strategy,time_strategy,timesq_strategy,BMI,
-,REGION,TREATINGCENTRETYPE,ETHNICITY2,AGE,STAGE,DEPRIVATION,maintenanceflag,yearoftreatment,PSEUDO_PAT,GRADE,interval, survivalmarker, discontinuationinterval,censor,row) %>% 
-  filter(strategy=="Completion")
-    
-discontinuation_df <- combined_dataset %>%
-    dplyr::select(ID,time,timesq,strategy,time_strategy,timesq_strategy,BMI,
-,REGION,TREATINGCENTRETYPE,ETHNICITY2,AGE,STAGE,DEPRIVATION,maintenanceflag,yearoftreatment,PSEUDO_PAT,GRADE,interval, survivalmarker, discontinuationinterval,censor,row)%>% 
-  filter(strategy=="Discontinuation")
-
- # create hazards under each strategy
-   completion_df$hazard1 <- predict(survival_curve_model, newdata=completion_df, type="response")
-   discontinuation_df$hazard0 <- predict(survival_curve_model, newdata=discontinuation_df, type="response")
-
- # calculate survival from the cumulative product of the hazard at each timepoint
-   discontinuation_df<-discontinuation_df %>%    
-    group_by(ID) %>% 
-    arrange(ID, time) %>% 
-    mutate(survival0 = cumprod(hazard0))%>%
-    ungroup()
-  
-   
- completion_df<-completion_df %>%    
-    group_by(ID) %>% 
-    arrange(ID, time) %>% 
-    mutate(survival1 = cumprod(hazard1)) %>%
-    ungroup()
-
-# estimate risks as 1-survival
-   discontinuation_df <- discontinuation_df %>%
-     mutate(risk0 = (1-survival0)*100)
-   
-   completion_df <- completion_df %>%
-     mutate(risk1 = (1-survival1)*100)
-
-# calculate mean for each time point
-   discontinuation_df2 <- discontinuation_df %>%
-     group_by(interval) %>%
-     summarise(risk = mean(risk0),
-               survival = mean(survival0),
-               hazard = mean(hazard0),
-               lower_ci=quantile(survival0,0.05),
-               upper_ci=quantile(survival0,0.95),
-               lowerci_risk=quantile(risk0,0.05),
-               upperci_risk=quantile(risk0,0.95)) %>% 
-     mutate(strategy="Discontinuation")
-   
-   completion_df2 <- completion_df %>%
-     group_by(interval) %>%
-     summarise(risk = mean(risk1),
-               survival = mean(survival1),
-               hazard = mean(hazard1),
-               lower_ci=quantile(survival1,0.05),
-               upper_ci=quantile(survival1,0.95),
-               lowerci_risk=quantile(risk1,0.05),
-               upperci_risk=quantile(risk1,0.95)) %>% 
-     mutate(strategy="Completion")
-   
-   risk_curves <- full_join(discontinuation_df2, completion_df2)
-   
-   risk_curves_wider <- risk_curves %>%
-     pivot_wider(
-       id_cols = interval,
-       names_from = strategy,
-       values_from = c(risk,lowerci_risk, upperci_risk, survival,lower_ci, upper_ci, hazard),
-       names_sep = "_"
-     )
-
-# this is taken from the supplement of https://www.bmj.com/content/375/bmj-2021-066306/related#datasupp
-   risk_curves_wider <- risk_curves_wider %>%
-     mutate(hazard_ratio = log(risk_Discontinuation)/log(risk_Completion))
-
-#Estimate CI
-discontinuation<-risk_curves %>% 
-  filter(strategy=="Discontinuation")
-completion<-risk_curves %>% 
-  filter(strategy!="Discontinuation")
-mean(discontinuation$survival) #0.71
-mean(discontinuation$lower_ci) #0.41
-mean(discontinuation$upper_ci) #0.95
-
-mean(completion$survival) #0.71
-mean(completion$lower_ci) #0.45
-mean(completion$upper_ci) #0.93
-completion %>% write_csv("completion_survival.csv")
-discontinuation %>% write_csv("discontinuation_survival.csv")
-
-discontinuation_df2<-discontinuation_df2 %>% 
-  arrange(desc(survival)) %>% 
-  mutate(interval=row_number()) %>% 
-  mutate(risk=(1-survival)*100)
-
-completion_df2<-completion_df2 %>% 
-  arrange(desc(survival)) %>% 
-  mutate(interval=row_number())  %>% 
-  mutate(risk=(1-survival)*100)
-
-discontinuation_df2<-discontinuation_df2 %>% 
-  arrange(risk) %>% 
-  mutate(interval=row_number())
-
-completion_df2<-completion_df2 %>% 
-  arrange(risk) %>% 
-  mutate(interval=row_number())
-```
-
-Estimate hazard ratios, absolute and risk ratios. Save this as a dataframe.
-```{r}
-#hazard ratio is average of hazard ratios over time
-hazard_ratio_estimate <- mean(risk_curves_wider$hazard_ratio) #1.117 (59% CI 1.024737 1.305902)
-quantile(risk_curves_wider$hazard_ratio, c(0.05,0.95)) 
-
-#At 1 year
-discontinuation_risk_12<-discontinuation_df2[discontinuation_df2$interval == 11,]$risk #11.08894 risk for early discontinuation
-discontinuation_df2[discontinuation_df2$interval == 11,]$lowerci_risk #2.339781 LCI
-discontinuation_df2[discontinuation_df2$interval == 11,]$upperci_risk#22.81026 UCI
-
-continuation_risk_12<-completion_df2[completion_df2$interval == 11,]$risk #8.268269 risk for completion at 1 year
-completion_df2[completion_df2$interval == 11,]$lowerci_risk #2.169762 LCI
-completion_df2[completion_df2$interval == 11,]$upperci_risk#16.51437 UCI
-
-#At 2 years
-discontinuation_risk_24 <- discontinuation_df2[discontinuation_df2$interval == 23,]$risk #26.35727
-discontinuation_df2[discontinuation_df2$interval == 23,]$lowerci_risk #6.457653 LCI
-discontinuation_df2[discontinuation_df2$interval == 23,]$upperci_risk#50.13032 UCI
-
-continuation_risk_24 <- completion_df2[completion_df2$interval == 23,]$risk #21.13107% risk for completion
-completion_df2[completion_df2$interval == 23,]$lowerci_risk #6.080551 LCI
-completion_df2[completion_df2$interval == 23,]$upperci_risk#39.67215 UCI
-
-#At 5 years
-discontinuation_risk_60 <- discontinuation_df2[discontinuation_df2$interval == 59,]$risk #42.61 risk
-discontinuation_df2[discontinuation_df2$interval == 59,]$lowerci_risk #13.49438 LCI
-discontinuation_df2[discontinuation_df2$interval == 59,]$upperci_risk#77.54737 UCI
-
-continuation_risk_60 <- completion_df2[completion_df2$interval == 59,]$risk #32.97
-completion_df2[completion_df2$interval == 59,]$lowerci_risk #10.25 LCI
-completion_df2[completion_df2$interval == 59,]$upperci_risk#60.07 UCI
-
-
-#Calculate risk ratios and differences. This is required for the next stages and bootstrapping.
- risk_ratio_12 <- discontinuation_risk_12/continuation_risk_12
- risk_diff_12 <- discontinuation_risk_12-continuation_risk_12
- risk_ratio_24 <- discontinuation_risk_24/continuation_risk_24
- risk_diff_24 <- discontinuation_risk_24-continuation_risk_24
- risk_ratio_60 <- discontinuation_risk_60/continuation_risk_60
- risk_diff_60 <- discontinuation_risk_60-continuation_risk_60
-
- risk_df <- data.frame(
-   estimate_hr = hazard_ratio_estimate,
-   risk_ratio_12months = risk_ratio_12,
-   risk_ratio_24months = risk_ratio_24,
-   risk_ratio_60months = risk_ratio_60,
-   risk_diff_12months = risk_diff_12,
-   risk_diff_24months = risk_diff_24,
-   risk_diff_60months = risk_diff_60,
-   abs_risk_continuation_12 = continuation_risk_12,
-   abs_risk_continuation_24 = continuation_risk_24,
-   abs_risk_continuation_60 = continuation_risk_60,
-   abs_risk_tapering_12 = discontinuation_risk_12, 
-   abs_risk_tapering_24 = discontinuation_risk_24,
-   abs_risk_tapering_60 = discontinuation_risk_60
- )
- rownames(risk_df) <- NULL
- 
-
-
-risk_df <- data.frame(
-  estimate_hr = hazard_ratio_estimate,
-  risk_ratio_12months = risk_ratio_12,
-  risk_ratio_24months = risk_ratio_24,
-  risk_diff_12months = risk_diff_12,
-  risk_diff_24months = risk_diff_24,
-  abs_risk_continuation_12 = continuation_risk_12,
-  abs_risk_continuation_24 = continuation_risk_24,
-  abs_risk_continuation_60 = continuation_risk_60,
-  abs_risk_discontinuation_12 = discontinuation_risk_12, 
-  abs_risk_discontinuation_24 = discontinuation_risk_24,
-  abs_risk_discontinuation_60 = discontinuation_risk_60,
-)
-
-return(risk_df)
-}
-```
-
-
-```{r}
-# then the bootstrap code is as follows
-
-n_boot <- 3
+#Define number of bootstrapping iterations
+n_boot <- 5
 
 # create an empty dataframe for each outcome/trial you are interested in
-survival_bootstrapped_estimates <- data.frame()
+stroke_bootstrapped_estimates <- data.frame()
 
 #Pre-split data by patient ID and NOT the rows (MUCH faster for repeated lookups)
-df_split <- split(data, data$ID)
+df_split <- split(combined_12weeks, combined_12weeks$patid)
 patids <- names(df_split)
 n_patients <- length(patids)
 
 for (i in 1:n_boot){
-  print("bootstrap sample")
+  print("bootstrap sample #")
   print(i)
   
   sampled_ids <- sample(patids, size = n_patients, replace = TRUE)
@@ -2816,18 +2367,18 @@ for (i in 1:n_boot){
   sample_data <- do.call(rbind, lapply(seq_along(sampled_ids), function(j) {
     patient_data <- df_split[[sampled_ids[j]]]
     patient_data$bootstrap_rep <- j
-    patient_data$patid<- paste0(sampled_ids[j], "_", i)  # Make unique if needed
+    patient_data$patid<- paste0(sampled_ids[j], "_", j)  # Make unique if needed
     patient_data
   }))
   
   
-  survival_estimate <- trial_function(sample_data)
-  bootstrapped_estimates <- rbind(survival_estimate, survival_bootstrapped_estimates)
+  stroke_estimate <- trial_function(sample_data)
+  stroke_bootstrapped_estimates <- rbind(stroke_estimate, stroke_bootstrapped_estimates)
   
   # would highly recommend updating the data row by row and saving rather than waiting
   # for the whole thing to run in case it breaks/stops running 
   fwrite(stroke_bootstrapped_estimates, 
-         "bootstrapped results.csv", row.names=FALSE)
+         "filepath.csv", row.names=FALSE)
   
 }
 ```
@@ -3036,5 +2587,3 @@ risk_curves_plot<-risk_curves %>%
      ) +
      theme_minimal()+xlim(0,60)+ylim(0,100)
 ```
-
-
