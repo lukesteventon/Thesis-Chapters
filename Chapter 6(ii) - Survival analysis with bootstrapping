@@ -15,9 +15,9 @@ testdata<-testdata %>%
   mutate(interval=as.numeric(str_replace_all(interval,'interval',''))) %>% 
   arrange(ID, interval) %>% 
   mutate(time=interval) %>% 
-  mutate(timesq=time^2) %>%
-  mutate(timesqch=as.character(time^2)) %>% 
-  mutate(time=as.character(time)) %>% 
+  mutate(timesq=as.factor(time^2)) %>%
+  mutate(timesqch=as.factor(time^2)) %>% 
+  mutate(time=as.factor(time)) %>% 
   rename(maxcycle=maxcycles)
 
 testdata %>% 
@@ -58,10 +58,16 @@ trial_function<-function(sample_data){
   #Logistic regression for probability of remaining uncensored at each time point
   #sixcycles$probability_of_uncensoring<-glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles$probability_of_uncensoring)
   
+  sixcycles %>% 
+    skimr::skim()
+  
+  
   #This logistic regression produces coefficients for covariates and the probabilty of remaining uncensored (i.e. remaining in the study)
   probability_of_uncensoring_sixcycles<-suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-                                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles))
+                                                               REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles))
   
+  
+  summary(probability_of_uncensoring_sixcycles)  
   sixcycles <- sixcycles %>% 
     mutate(p1=predict(probability_of_uncensoring_sixcycles, type = "response")) #This line creates a new column with 
   
@@ -79,8 +85,8 @@ trial_function<-function(sample_data){
   IPCW_truncation<-quantile(sixcycles$IPCW, c(.99)) 
   
   #Weights before truncation
-  #        1%        50%        75%        90%        95%        99%       100% 
-  #  XXX 
+  #        1%          50%          75%          90%          95%          99%       100% 
+  # 1.000000         1.143339   1.216786      1.291885     1.352053     1.507941   1.982159
   
   #Truncate IPCWs greater than the 99th percentile.
   sixcycles<-sixcycles %>% 
@@ -88,11 +94,11 @@ trial_function<-function(sample_data){
   
   #Weights after truncation
   quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-  #      1%      50%      75%      90%      95%      99%     100% 
-  #XXX
+  #      1%         50%          75%          90%           95%           99%         100% 
+  # 1.000000    1.143339     1.216786      1.291885       1.352053     1.507941     1.507941
   #Logistic regression for probability of remaining uncensored at each time point
   probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
-                                                        REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
+                                                                         REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
   
   less_than_six_cycles<-less_than_six_cycles %>% 
     mutate(p1=predict(probability_of_uncensoring_lessthansixcycles, type = "response")) #This line creates a new column with 
@@ -112,7 +118,7 @@ trial_function<-function(sample_data){
   
   #Weights before truncation
   #        1%        50%        75%        90%        95%        99%       100% 
-  #  XXX 
+  # 1.000000     4.676346    6.548843   10.269420   12.792998  23.689449  49.907231 
   
   #Truncate IPCWs greater than the 99th percentile.
   less_than_six_cycles<-less_than_six_cycles %>% 
@@ -120,8 +126,9 @@ trial_function<-function(sample_data){
   
   #Weights after truncation
   quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-  #      1%      50%      75%      90%      95%      99%     100% 
-  #XXX
+  #      1%      50%       75%       90%        95%       99%     100% 
+  #  1.000000  4.676346  6.548843 10.269420 12.792998 23.689449 23.689449
+  
   
   #Create a new dataset containing data for all patients
   combined_dataset<-rbind(less_than_six_cycles,sixcycles) %>% 
@@ -323,8 +330,7 @@ trial_function<-function(sample_data){
 #point_estimate<-trial_function(sample_data)
 
 # then the bootstrap code is as follows
-n_boot <- 1000
-
+n_boot <- 2
 # create an empty dataframe for each outcome/trial you are interested in
 survival_bootstrapped_estimates <- data.frame()
 
