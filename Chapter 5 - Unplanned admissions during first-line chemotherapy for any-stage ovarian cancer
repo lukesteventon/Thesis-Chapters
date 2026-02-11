@@ -262,8 +262,10 @@ surgery_list<-cohort3 %>%
   distinct(PSEUDO_PAT,timesurgerytoindex) %>% 
   arrange(PSEUDO_PAT, timesurgerytoindex) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<181, "PDS",NA)) %>% 
-  mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-181, "IDS",surgery)) %>% 
+ # mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<181, "PDS",NA)) %>% 
+  #mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-181, "IDS",surgery)) %>% 
+mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<29, "PDS",NA)) %>% #Updated to get those admitted in the month before treatment start - comparable to ovarian cancer audit?
+  mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-29, "IDS",surgery)) %>% #Updated to get those admitted in the month before treatment start - comparable to ovarian cancer audit?
   mutate(surgery=ifelse(is.na(surgery),"No surgery", surgery))
 
 surgery_list%>% 
