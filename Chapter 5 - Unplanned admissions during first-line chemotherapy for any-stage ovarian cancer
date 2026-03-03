@@ -6,17 +6,17 @@ output: html_document
 ---
 Load packages and set working directory.
 ```{r setup, include=FALSE}
-install.packages("tidyverse")
-install.packages("kableExtra")
-install.packages("broom")
-install.packages("ggplot2")
-install.packages("skimr")
-install.packages("survminer")
-install.packages("survival")
-install.packages("rbin")
-install.packages("readr")
-install.packages("here")
-install.packages("gtsummary")
+#install.packages("tidyverse")
+#install.packages("kableExtra")
+#install.packages("broom")
+#install.packages("ggplot2")
+#install.packages("skimr")
+#install.packages("survminer")
+#install.packages("survival")
+#install.packages("rbin")
+#install.packages("readr")
+#install.packages("here")
+#install.packages("gtsummary")
 library(tidyverse)
 library(kableExtra)
 library(broom)
@@ -243,6 +243,8 @@ Assign surgical status based on surgery date and first chemotherapy:
 cohort %>% 
   skimr::skim()
 
+cohort$lineoftherapy
+
 #Link all surgery dates initially and calculate time between first SACT and first surgery
 cohort3<-allsurgeries %>% 
   distinct(PSEUDO_PAT,EVENTDATE,.keep_all=T) %>% 
@@ -262,10 +264,8 @@ surgery_list<-cohort3 %>%
   distinct(PSEUDO_PAT,timesurgerytoindex) %>% 
   arrange(PSEUDO_PAT, timesurgerytoindex) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
- # mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<181, "PDS",NA)) %>% 
-  #mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-181, "IDS",surgery)) %>% 
-mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<29, "PDS",NA)) %>% #Updated to get those admitted in the month before treatment start - comparable to ovarian cancer audit?
-  mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-29, "IDS",surgery)) %>% #Updated to get those admitted in the month before treatment start - comparable to ovarian cancer audit?
+  mutate(surgery=ifelse(timesurgerytoindex>0&timesurgerytoindex<181, "PDS",NA)) %>% 
+  mutate(surgery=ifelse(timesurgerytoindex<0&timesurgerytoindex>-181, "IDS",surgery)) %>% 
   mutate(surgery=ifelse(is.na(surgery),"No surgery", surgery))
 
 surgery_list%>% 
@@ -614,39 +614,49 @@ hes_data<-read_csv(
 Outcome 1: Defined unplanned admission within 30 days of initiation of first-line chemotherapy:
 ```{r}
 cohort %>% 
-  count(PSEUDO_PAT) #n=14,730
+  count(PSEUDO_PAT) #n=14,671
 
 #Link to HES data for all interactions. Index date and unplanned admission dates can then be compared.
 cohort_with_admissions<-cohort %>% 
   group_by(PSEUDO_PAT) %>% 
   mutate(index=min(ADMINISTRATION_DATE)) %>% 
+  mutate(last_treatment=max(ADMINISTRATION_DATE)) %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   #select(PSEUDO_PAT, index, DRUG_GROUP, ADMINISTRATION_DATE) %>% 
   left_join(hes_data,by = "PSEUDO_PAT") #%>% 
   #filter(Admission=="Unplanned")
 
 cohort_with_admission2<-cohort_with_admissions %>% 
-  mutate(indextoadmission=as.numeric(difftime(index,ADMIDATE, units = "days"))) %>% 
-  mutate(admission_within_30_days=ifelse(indextoadmission<31&indextoadmission>-1&Admission=="Unplanned", 1, NA)) %>% 
-  mutate(admission_before_chemotherapy=ifelse(indextoadmission<0&indextoadmission>-181&Admission=="Unplanned", 1, NA)) %>% #Added - flags admissions up to 6 months before chemotherapy
+  mutate(indextoadmission=as.numeric(difftime(ADMIDATE,index, units = "days"))) %>% 
+  mutate(admission_within_30_days=ifelse(indextoadmission>-1&indextoadmission<31&Admission=="Unplanned", 1, NA)) %>% 
+  mutate(admission_before_chemotherapy=ifelse(indextoadmission<0&indextoadmission>-181&Admission=="Unplanned", 1, NA)) %>%
+    mutate(admission_before_chemotherapy_1month=ifelse(indextoadmission<0&indextoadmission>-31&Admission=="Unplanned", 1, NA)) %>% #Added - flags admissions up to 6 months before chemotherapy
+#Added - flags admissions up to 6 months before chemotherapy
   group_by(PSEUDO_PAT) %>% 
   fill(admission_within_30_days,.direction="updown") %>% 
   fill(admission_before_chemotherapy,.direction="updown") %>% 
+    fill(admission_before_chemotherapy_1month,.direction="updown") %>% 
+
   #distinct(PSEUDO_PAT,.keep_all=T) %>% 
   ungroup()
+
+cohort_with_admission2 %>% 
+  select(PSEUDO_PAT,index, admission_within_30_days, ADMINISTRATION_DATE, ADMIDATE,indextoadmission,Admission)
+
 
 #Count number of unplanned admissions within 30 days of first chemotherapy
 admissionswithin30days<-cohort_with_admission2 %>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
-  select(PSEUDO_PAT, admission_within_30_days, admission_before_chemotherapy) %>% 
+  select(PSEUDO_PAT, admission_within_30_days, admission_before_chemotherapy,admission_before_chemotherapy_1month) %>% 
   count(admission_within_30_days,admission_before_chemotherapy)
 
-#1621 of 14730 (11.0%) patients had admission within 30 days of first SACT
-#4952 of 14730 (33.6%) were admitted in the 6 months before starting chemotherapy
-#5452 of 14730 (37%) had no unplanned admission up to 6 months before, or within 1 month of starting chemo
-#2705 of 14730 (18.4%) were admitted in the 6 months before starting chemotherapy and were then admitted in the first month after starting chemo
+admissionswithin30days
+#1297 of 14671 (8.8%) patients had admission within 30 days of first SACT
+#5896 of 14671 (40.2%) were admitted in the 6 months before starting chemotherapy
+#4724 of 14671 (32.2%) had no unplanned admission up to 6 months before, or within 1 month of starting chemo
+#2754 of 14671 (18.8%) were admitted in the 6 months before starting chemotherapy and were then admitted in the first month after starting chemo
 
-#In total, 4,326/14,730 were admitted through unplanned routes within 30 days of first SACT (29.4%). This is the primary study outcome.
+#In total, 4,051/14,671 were admitted through unplanned routes within 30 days of first SACT (27.6%). This is the primary study outcome.
 ```
 
 
@@ -658,7 +668,7 @@ write_csv("admissionswithin30days_ovarian.csv")
 
 ###############################################
 Outcome 1B: Time from first treatment to admissions:
-n=4,326 were admitted through unplanned routes within 30 days of initiating first-line chemotherapy
+n=4,051 were admitted through unplanned routes within 30 days of initiating first-line chemotherapy
 ```{r}
 cohort_with_admission2 %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -668,11 +678,11 @@ cohort_with_admission2 %>%
   summary()
 
 #indextoadmission
-# Length:4326       Min.   : 0.00   
-# Class :character   1st Qu.:16.00   
-# Mode  :character   Median :22.00   - median time to admission from index date,n=4585
-#                    Mean   :20.95   
-#                    3rd Qu.:27.00   
+# Length:4051      Min.   : 0.00   
+# Class :character   1st Qu.:19.00   
+# Mode  :character   Median :21.00   - median time to admission from index date,n=4585
+#                    Mean   :20.3   
+#                    3rd Qu.:26.00   
 #                    Max.   :30.00
 ```
 Outcome 1c: Median length of unplanned hospital admission when admitted within 30 days:
@@ -690,13 +700,13 @@ cohort_with_admission2 %>%
   distinct(PSEUDO_PAT,ADMIDATE,.keep_all=T) %>% 
   summary()
 
-#5314  individual admission spells for 14,730 patients admitted within 30 days of first SACT, median length of admission was 2 days, IQR 0-8. This calculation was performed using ADMIDATE AND DISDATE.
+#41784  individual admission spells for 14,671 patients admitted within 30 days of first SACT, median length of admission was 2 days, IQR 0-8. This calculation was performed using ADMIDATE AND DISDATE.
 # Min.   :  0.000    
 # 1st Qu.:  1.000    
-# Median :  4.000    
-# Mean   :  7.214   
-# 3rd Qu.:  8.000    
-# Max.   :158.00
+# Median :  2.000    
+# Mean   :  5.129   
+# 3rd Qu.:  6.000    
+# Max.   :116.00
 
 #Proof using spell length to check calculation is correct
 cohort_with_admission2 %>% 
@@ -710,14 +720,92 @@ cohort_with_admission2 %>%
   mutate(SPELDUR=as.numeric(SPELDUR)) %>% 
   summary()
 
-#N=5314 individual admissions in 14,730 patients
+#N=4178 individual admissions in 14,671 patients
 #Using spell length instead of manually calculating length of admission, results are identical to the manual calculation performed above.
 #   1st Qu.:  1.000  
-#   Median :  4.000  
-#   Mean   :  7.214 
-#   3rd Qu.:  8.000  
-#   Max.   :158.000  
+#   Median :  2.000  
+#   Mean   :  5.129 
+#   3rd Qu.:  6.000  
+#   Max.   :116.000  
 ```
+Calculate number of individual SACT treatments before and after first admission.
+```{r}
+#Calculate difference in time between first admission and each individual treatment date
+cohort_with_admission3<-cohort_with_admission2 %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  #mutate(firstadmissiondate=index+indextoadmission) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
+  #mutate(firstadmissiondate=min(firstadmissiondate)) %>% 
+ filter(indextoadmission>-1&Admission=="Unplanned") %>% 
+  mutate(firstadmissiondate=index+indextoadmission) %>% 
+  arrange(PSEUDO_PAT, indextoadmission) %>% 
+  arrange(PSEUDO_PAT, indextoadmission) %>% 
+
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  #mutate(flag=difftime(index, firstadmissiondate, units = "days")) %>% 
+    select(PSEUDO_PAT,  firstadmissiondate) %>%  # %>% 
+right_join(cohort_with_admission2, by = "PSEUDO_PAT")
+  #select(PSEUDO_PAT,ADMINISTRATION_DATE,index, firstadmissiondate, flag) %>% 
+  #filter(flag<1) %>% 
+  #mutate(flag=-flag) %>% 
+  #filter(flag<31)#retain only those hospitalised within 30 days
+
+treatments<-cohort %>% 
+  select(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE)
+
+#Cumulative count of SACT administrations before first admission
+cohort_with_admission4<-cohort_with_admission3 %>% 
+  select(-ADMINISTRATION_DATE) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT, firstadmissiondate) %>% 
+  left_join(treatments, by= "PSEUDO_PAT") %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(treatmentsbeforeadmission=ifelse(ADMINISTRATION_DATE<=firstadmissiondate,1,0)) %>% 
+  mutate(treatmentsbeforeadmission=sum(treatmentsbeforeadmission)) %>% 
+  mutate(treatmentsafteradmission=ifelse(ADMINISTRATION_DATE>firstadmissiondate,1,0)) %>% 
+  mutate(treatmentsafteradmission=sum(treatmentsafteradmission)) %>% 
+  #mutate(treatmentsafteradmission=ifelse(ADMINISTRATION_DATE>=firstadmissiondate,1,0)) %>% 
+  #mutate(treatmentsafteradmission=sum(treatmentsafteradmission)) %>%
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT,treatmentsbeforeadmission, treatmentsafteradmission) %>% 
+  merge(cohort_with_admission3, by="PSEUDO_PAT")%>% 
+  ungroup()
+
+cohort_with_admission4<-cohort_with_admission4 %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(treatmentsbeforeadmission=ifelse(is.na(treatmentsbeforeadmission),1,treatmentsbeforeadmission)) %>% 
+  fill(treatmentsbeforeadmission,.direction="updown") %>% 
+  fill(treatmentsafteradmission,.direction="updown") %>% 
+  ungroup()
+
+cohort_with_admission4 %>% 
+  summary()
+```
+
+Create df describing if patient ended treatment or died as a result of admission:
+```{r}
+extra_variables<-cohort_with_admission4 %>% 
+  select(PSEUDO_PAT, treatmentsbeforeadmission,firstadmissiondate,treatmentsafteradmission,index, ADMIDATE, VITALSTATUSDATE, VITALSTATUSDATE,admission_before_chemotherapy_1month) %>% 
+  #distinct(PSEUDO_PAT,.keep_all = T) %>% 
+  #group_by(PSEUDO_PAT) %>% 
+  mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(difftime=difftime(VITALSTATUSDATE, firstadmissiondate, units = "days")) %>% 
+  mutate(notreatmentafteradmission=ifelse(treatmentsafteradmission==0,1,NA)) %>% 
+  mutate(diedduringadmission=ifelse(difftime<30&difftime>-1,1,NA)) %>% 
+  fill(notreatmentafteradmission,.direction="updown") %>% 
+  fill(diedduringadmission,.direction="updown") %>% 
+  mutate(notreatmentafteradmission=ifelse(is.na(notreatmentafteradmission),0,notreatmentafteradmission)) %>% 
+  mutate(diedduringadmission=ifelse(is.na(diedduringadmission),0,diedduringadmission)) %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT, notreatmentafteradmission, diedduringadmission,difftime,firstadmissiondate,admission_before_chemotherapy_1month)%>% 
+  mutate(admission_before_chemotherapy_1month=ifelse(is.na(admission_before_chemotherapy_1month),0,admission_before_chemotherapy_1month))
+```
+
+
 To link performance status, we must import the cycle tables. This is important to be incorporated into the multivariable logistic regression as this is known to be a significant factor affecting likelihood of hospital admission.
 ```{r}
 #Import cycle tables containing PS data
@@ -747,6 +835,8 @@ NEW_PS<-NEW_PS %>%
 all_PS<-rbind(NEW_PS,OLD_PS)
 
 all_PS %>% skimr::skim() #PS = 70.86% complete in the SACT data
+
+
 
 #Merge available PS to the dataset:
 summarydata<-cohort_with_admission2 %>% 
@@ -779,7 +869,7 @@ regression_data<-cohort_with_admission2 %>%
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Black"),"Black",ETHNICITY2)) %>% 
   mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME, "Unknown|UNKNOWN|NOT|Not"),"Unknown",ETHNICITY2)) %>% 
   mutate(AGE=as.numeric(AGE)) %>% 
-  mutate(BMI=as.numeric(BMI))
+  mutate(BMI=as.numeric(BMI)) 
 
 regression_data$ethnicitygroup<-as.factor(regression_data$ethnicitygroup)
 regression_data$ethnicitygroup<-relevel(regression_data$ethnicitygroup, ref = "White")
@@ -845,11 +935,6 @@ Univariable analysis to investigate association of factors with the outcome:
 ```{r}
 regression_data2$IMD2015_1<-as.factor(regression_data2$IMD2015_1)
 regression_data2$IMD2015_1<-relevel(regression_data2$IMD2015_1, ref = "3")
-prior_admission<-lm(admission_within_30_days~admission_before_chemotherapy,data=regression_data2,family="binomial")
-prior_admission<-tidy(imd, exponentiate = TRUE, conf.int = TRUE)
-prior_admission %>% 
-write_csv("prior_admission_univariate.csv")
-
 imd<-lm(admission_within_30_days~IMD2015_1,data=regression_data2,family="binomial")
 imd_univariate<-tidy(imd, exponentiate = TRUE, conf.int = TRUE)
 imd_univariate %>% 
@@ -984,8 +1069,10 @@ Multivariable logistic regression comparing admission within 30 days of starting
 regression_data2 %>% 
   skimr::skim()
 
+regression_data2$admission_before_chemotherapy_1month
+
 #Create logistic regression model 
-complete_case_analysis_model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment+admission_before_chemotherapy,data=regression_data2,family="binomial")
+complete_case_analysis_model<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
 summary(complete_case_analysis_model) #n=12,088 patients included in logistic regression
@@ -1006,7 +1093,7 @@ regression_data2 %>%
   skimr::skim()
 
 #Create logistic regression model 
-all_patients_model<-glm(admission_within_30_days~surgery+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+regimen+year_of_treatment+admission_before_chemotherapy,data=regression_data2,family="binomial")
+all_patients_model<-glm(admission_within_30_days~surgery+ETHNICITY2+AGE2+STAGE_BEST_CLEAN+regimen+admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 
 #Variables removed
 summary(all_patients_model) 
@@ -1026,7 +1113,7 @@ regression_table_all %>%
 Outcome 2b: Run glm with ethnicity as white/non-white to check robustness of grouping these patients.
 ```{r}
 #Create logistic regression model 
-model2<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment+admission_before_chemotherapy,data=regression_data2,family="binomial")
+model2<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
 summary(model2)
@@ -1045,7 +1132,7 @@ regression_table2 %>%
 Outcome 2c: Try other models using interaction terms between ethnicity and IMD
 ```{r}
 #Run other models using interaction terms
-model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS2+BMI2+regimen+GRADE+year_of_treatment+admission_before_chemotherapy,data=regression_data2,family="binomial")
+model_interaction_age_surgery<-glm(admission_within_30_days~surgery+(ETHNICITY2*IMD2015_1)+REGION+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+PS2+BMI2+regimen+GRADE+admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 #Summarise logistic regression
 summary(model_interaction_age_surgery)
 
@@ -1059,7 +1146,7 @@ regression_table_2 %>%
 Outcome 2c: Alternative model using region*ethnicity interaction term
 ```{r}
 #Create logistic regression model 
-model_interaction_region_ethnicity<-glm(admission_within_30_days~surgery+IMD2015_1+(REGION*ETHNICITY2)+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+year_of_treatment+admission_before_chemotherapy,data=regression_data2,family="binomial")
+model_interaction_region_ethnicity<-glm(admission_within_30_days~surgery+IMD2015_1+(REGION*ETHNICITY2)+CENTRETYPE+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 
 #Summarise logistic regression
 summary(model_interaction_region_ethnicity)
@@ -1109,18 +1196,21 @@ cohort_with_admission2<-cohort_grade %>%
 Create summary tables which compare rate of unplanned admission by demographic factors.
 
 ```{r}
+regression_data2<-extra_variables %>% 
+  merge(regression_data2,by="PSEUDO_PAT")
 
 regression_data2<-regression_data2 %>% 
   mutate(PS=as.numeric(PS))
 regression_data2$PS2<-cut(regression_data2$PS, breaks=c(0,1,2,10), right = FALSE)
-
+regression_data2 <- regression_data2 %>% 
+  rename(admission_before_chemotherapy_1month=admission_before_chemotherapy_1month.x)
 regression_data2%>% 
   distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
   mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,year_of_treatment,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,year_of_treatment,regimen,notreatmentafteradmission, diedduringadmission,admission_before_chemotherapy_1month) %>%
   tbl_summary(by="admission_within_30_days",percent="row") %>% 
   add_overall() %>% 
   add_ci() %>% 
@@ -1134,7 +1224,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(AGE=as.numeric(AGE)) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,notreatmentafteradmission, diedduringadmission) %>%
    tbl_summary(by="IMD2015_1",percent="row") %>% 
    add_overall() %>% 
   add_ci() %>% 
@@ -1148,7 +1238,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(AGE=as.numeric(AGE)) %>% 
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,notreatmentafteradmission, diedduringadmission) %>%
   tbl_summary(by="ethnicitygroup",percent="row") %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1164,7 +1254,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(AGE=as.numeric(AGE)) %>%
    mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
    mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,notreatmentafteradmission, diedduringadmission) %>%
    tbl_summary(by="ETHNICITY2",percent="row") %>% 
    add_overall() %>% 
     add_ci() %>% 
@@ -1180,7 +1270,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,notreatmentafteradmission, diedduringadmission) %>%
   tbl_summary(by="AGE2") %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1195,7 +1285,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
    mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,notreatmentafteradmission, diedduringadmission) %>%
   tbl_summary(by=REGION) %>% 
   add_overall() %>% 
     add_ci() %>% 
@@ -1215,7 +1305,7 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
     mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
 
-  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>%
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission, diedduringadmission) %>%
   tbl_summary(by="year_of_treatment") %>% 
   add_overall() %>% 
   add_ci() %>% 
