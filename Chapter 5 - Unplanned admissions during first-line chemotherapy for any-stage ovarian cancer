@@ -940,7 +940,7 @@ imd_univariate<-tidy(imd, exponentiate = TRUE, conf.int = TRUE)
 imd_univariate %>% 
 write_csv("imd_univariate.csv")
 
-previoushx<-lm(admission_within_30_days~admission_before_chemotherapy_1month.x,data=regression_data2,family="binomial")
+previoushx<-lm(admission_within_30_days~admission_before_chemotherapy_1month,data=regression_data2,family="binomial")
 previoushx_univariate<-tidy(previoushx, exponentiate = TRUE, conf.int = TRUE)
 previoushx_univariate %>% 
 write_csv("previoushx_univariate.csv")
@@ -1317,4 +1317,382 @@ distinct(PSEUDO_PAT,.keep_all=T) %>%
   add_p() %>% 
   as_gt() %>% 
   gt::gtsave("baseline_table_study1_by_year.docx")
+```
+
+Read/write regression table for easier analysis:
+```{r}
+#regression_data2%>% 
+#  write_csv("regression_data.csv")
+
+regression_data2<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Unplanned admissions during first-line chemotherapy\\regression_data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) 
+```
+
+Feedback from supervision meeting - analyis needs more granularity on early vs late stage and surgery settings
+Further analyses by early- vs advanced-stage:
+```{r}
+regression_data2 %>% 
+distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
+  mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="STAGE") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("baseline_table_study1_by_STAGE.docx")
+```
+
+Analysis for advanced stage only
+```{r}
+#Create dataframe for advanced patients only
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="surgery") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_surgery.docx")
+
+#Time to admission in advanced stages (all surgery)
+regression_data2 %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Advanced stage") %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%
+  arrange(PSEUDO_PAT, desc(indextoadmission)) %>% 
+  select(PSEUDO_PAT, indextoadmission) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  summary()
+
+#All advanced stages, any surgery type
+#PSEUDO_PAT        indextoadmission
+# Length:742         Min.   : 0.000  
+# Class :character   1st Qu.: 0.000  
+# Mode  :character   Median : 6.000  
+#                    Mean   : 9.422  
+#                    3rd Qu.:19.000  
+#                    Max.   :30.000
+
+#Time to admission in advanced stages (PDS)
+regression_data2 %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Advanced stage"&surgery=="PDS") %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
+  arrange(PSEUDO_PAT, desc(indextoadmission)) %>% 
+  select(PSEUDO_PAT, indextoadmission) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  summary()
+
+#SEUDO_PAT        indextoadmission
+#Length:83          Min.   : 0.00   
+#Class :character   1st Qu.: 0.00   
+#Mode  :character   Median : 9.00   
+#                   Mean   :10.71   
+#                   3rd Qu.:21.00   
+#                   Max.   :29.00 
+
+#Time to admission in advanced stages (PDS)
+regression_data2 %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Advanced stage"&surgery=="IDS") %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
+  arrange(PSEUDO_PAT, desc(indextoadmission)) %>% 
+  select(PSEUDO_PAT, indextoadmission) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  summary()
+
+#SEUDO_PAT        indextoadmission
+#Length:83          Min.   : 0.00   
+#Class :character   1st Qu.: 0.00   
+#Mode  :character   Median : 6.00   
+#                   Mean   :9.392   
+#                   3rd Qu.:21.00   
+#                   Max.   :29.00 
+
+#Time to admission in advanced stages (PDS)
+regression_data2 %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Advanced stage"&surgery=="No surgery") %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
+  arrange(PSEUDO_PAT, desc(indextoadmission)) %>% 
+  select(PSEUDO_PAT, indextoadmission) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  summary()
+
+#PSEUDO_PAT        indextoadmission
+# Length:427         Min.   : 0.000  
+# Class :character   1st Qu.: 0.000  
+# Mode  :character   Median : 7.000  
+#                    Mean   : 9.187  
+#                    3rd Qu.:17.000  
+#                    Max.   :30.000 
+
+advanced_stage<-regression_data2 %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Advanced stage") %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days))
+
+advanced_stage$ethnicitygroup<-relevel(as.factor(advanced_stage$ethnicitygroup), ref = "White")
+advanced_stage$ETHNICITYNAME<-as.factor(advanced_stage$ETHNICITYNAME)
+advanced_stage$ETHNICITYNAME<-relevel(advanced_stage$ETHNICITYNAME, ref = "White")
+advanced_stage$surgery<-as.factor(advanced_stage$surgery)
+advanced_stage$surgery<-relevel(advanced_stage$surgery, ref = "PDS")
+advanced_stage$IMD2015_1<-as.factor(advanced_stage$IMD2015_1)
+advanced_stage$IMD2015_1<-relevel(advanced_stage$IMD2015_1, ref = "3")
+advanced_stage$REGION<-as.factor(advanced_stage$REGION)
+advanced_stage$REGION<-relevel(advanced_stage$REGION, ref = "LONDON COMMISSIONING REGION")
+advanced_stage$ETHNICITYNAME<-as.factor(advanced_stage$ETHNICITYNAME)
+advanced_stage$ETHNICITYNAME<-relevel(advanced_stage$ETHNICITYNAME, ref = "White")
+advanced_stage$GRADE<-as.factor(advanced_stage$GRADE)
+advanced_stage$GRADE<-relevel(advanced_stage$GRADE, ref = "Intermediate grade")
+advanced_stage$BMI2<-as.factor(advanced_stage$BMI2)
+advanced_stage$BMI2<-relevel(advanced_stage$BMI2, ref = "[18.5,25)")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_only.docx")
+```
+
+Analyse early stage by surgery
+```{r}
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="surgery") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("early_stage_by_surgery.docx")
+
+#Time to admission in early stages
+regression_data2 %>% 
+    mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Early stage") %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
+  arrange(PSEUDO_PAT, desc(indextoadmission)) %>% 
+  select(PSEUDO_PAT, indextoadmission) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  summary()
+
+#  PSEUDO_PAT        indextoadmission
+# Length:92          Min.   : 0.00   
+# Class :character   1st Qu.: 0.00   
+# Mode  :character   Median : 8.00   
+#                    Mean   :10.35   
+#                    3rd Qu.:21.00   
+#                    Max.   :29.00
+
+early_stage<-regression_data2 %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  filter(STAGE=="Early stage") %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days))
+
+early_stage$ethnicitygroup<-relevel(as.factor(early_stage$ethnicitygroup), ref = "White")
+early_stage$ETHNICITYNAME<-as.factor(early_stage$ETHNICITYNAME)
+early_stage$ETHNICITYNAME<-relevel(early_stage$ETHNICITYNAME, ref = "White")
+early_stage$surgery<-as.factor(early_stage$surgery)
+early_stage$surgery<-relevel(early_stage$surgery, ref = "PDS")
+early_stage$IMD2015_1<-as.factor(early_stage$IMD2015_1)
+early_stage$IMD2015_1<-relevel(early_stage$IMD2015_1, ref = "3")
+early_stage$REGION<-as.factor(early_stage$REGION)
+early_stage$REGION<-relevel(early_stage$REGION, ref = "LONDON COMMISSIONING REGION")
+early_stage$ETHNICITYNAME<-as.factor(early_stage$ETHNICITYNAME)
+early_stage$ETHNICITYNAME<-relevel(early_stage$ETHNICITYNAME, ref = "White")
+early_stage$GRADE<-as.factor(early_stage$GRADE)
+early_stage$GRADE<-relevel(early_stage$GRADE, ref = "Intermediate grade")
+early_stage$BMI2<-as.factor(early_stage$BMI2)
+early_stage$BMI2<-relevel(early_stage$BMI2, ref = "[18.5,25)")
+
+
+early_stage_surgery<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=early_stage,family="binomial")
+
+#Summarise logistic regression
+summary(early_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+early_stage_surgery_table<-tbl_regression(early_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+early_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_early_stage_only.docx")
+
+early_stage_surgery<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=early_stage,family="binomial")
+
+#Summarise logistic regression
+summary(early_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+early_stage_surgery_table<-tbl_regression(early_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+early_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_early_stage_only_ethnicitygroup.docx")
+```
+Analysis by PS:
+```{r}
+ps_data<-regression_data2 %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days))
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="PS2") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_ps.docx")
+
+
+early_stage_surgery<-glm(admission_within_30_days~surgery+IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=ps_data,family="binomial")
+```
+
+Further logistics for advanced patients only dependent on PDS:
+```{r}
+advanced_stage_PDS<- advanced_stage %>% 
+  filter(surgery=="PDS")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_PDS,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_PDS_only.docx")
+
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_PDS,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_PDS_only_ethnicity.docx")
+```
+
+
+Further logistics for advanced patients only dependent on IDS:
+```{r}
+advanced_stage_IDS<- advanced_stage %>% 
+  filter(surgery=="IDS")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_IDS,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_IDS_only.docx")
+
+advanced_stage_IDS<- advanced_stage %>% 
+  filter(surgery=="IDS")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_IDS,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_IDS_only_ethnicity_group.docx")
+```
+Further logistics for advanced patients only dependent on no surgery:
+```{r}
+advanced_stage_No_surgery<- advanced_stage %>% 
+  filter(surgery=="No surgery")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_No_surgery,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_no_surgery_only.docx")
+
+advanced_stage_No_surgery<- advanced_stage %>% 
+  filter(surgery=="No surgery")
+
+#Glm for advanced patients only
+advanced_stage_surgery<-glm(admission_within_30_days~IMD2015_1+REGION+CENTRETYPE+ethnicitygroup+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen+admission_before_chemotherapy_1month,data=advanced_stage_No_surgery,family="binomial")
+
+#Summarise logistic regression
+summary(advanced_stage_surgery)
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(advanced_stage_surgery, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("complete_case_analysis_advanced_stage_no_surgery_only_ethnicity_groups.docx")
 ```
