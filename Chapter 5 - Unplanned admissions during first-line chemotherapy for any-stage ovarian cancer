@@ -940,6 +940,11 @@ imd_univariate<-tidy(imd, exponentiate = TRUE, conf.int = TRUE)
 imd_univariate %>% 
 write_csv("imd_univariate.csv")
 
+previoushx<-lm(admission_within_30_days~admission_before_chemotherapy_1month.x,data=regression_data2,family="binomial")
+previoushx_univariate<-tidy(previoushx, exponentiate = TRUE, conf.int = TRUE)
+previoushx_univariate %>% 
+write_csv("previoushx_univariate.csv")
+
 grade<-lm(admission_within_30_days~GRADE,data=regression_data2,family="binomial")
 grade_univariate<-tidy(grade, exponentiate = TRUE, conf.int = TRUE)
 grade_univariate %>% 
