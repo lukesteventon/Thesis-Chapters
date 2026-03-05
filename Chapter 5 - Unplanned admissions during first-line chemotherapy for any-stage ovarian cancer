@@ -737,7 +737,7 @@ cohort_with_admission3<-cohort_with_admission2 %>%
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
   #mutate(firstadmissiondate=min(firstadmissiondate)) %>% 
- filter(indextoadmission>-1&Admission=="Unplanned") %>% 
+ filter(indextoadmission>-1&indextoadmission<31Admission=="Unplanned") %>% 
   mutate(firstadmissiondate=index+indextoadmission) %>% 
   arrange(PSEUDO_PAT, indextoadmission) %>% 
   arrange(PSEUDO_PAT, indextoadmission) %>% 
