@@ -659,6 +659,20 @@ admissionswithin30days
 #In total, 4,051/14,671 were admitted through unplanned routes within 30 days of first SACT (27.6%). This is the primary study outcome.
 ```
 
+Write table describing ICD codes associated with the first admission:
+```{r}
+cohort_with_admission2 %>% 
+  group_by(PSEUDO_PAT) %>% 
+  arrange(PSEUDO_PAT, indextoadmission) %>% 
+  filter(indextoadmission>-1&indextoadmission<31&!is.na(indextoadmission)&admission_within_30_days==1) %>% 
+  select(indextoadmission, DIAG4_01:DIAG4_20) %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(-PSEUDO_PAT) %>% 
+  write_csv("ICD10_codes.csv")
+
+```
+
 
 ```{r}
 #Write table showing number of admissions 
@@ -2134,12 +2148,12 @@ Outcome 1: Hospitalisations or unplanned attendance within 30 days of cycle 1 of
 ```{r}
 filter_list<-ovariansurgerycohort %>% distinct(PSEUDO_PAT)
 #Read HES APC data;
-#HESADMISSION1<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_22_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-#  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+HESADMISSION1<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_22_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+ #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
 #HESADMISSION2<-read_csv(
 #  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1013_2019Data.csv",
 #  col_names = TRUE,
@@ -3444,5 +3458,152 @@ regression_data2 %>%
   add_p() %>% 
   as_gt() %>% 
   gt::gtsave("advanced_stage_by_admission_nosurgery_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="admission_within_30_days") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_admission_all_surgeries_16MAR.docx")
+```
+
+
+Further tables 17MAR26
+```{r}
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="STAGE_BEST_CLEAN") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_stage_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="STAGE_BEST_CLEAN") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("early_stage_by_stage_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="REGION") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_region_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="IMD2015_1") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_IMD_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="ETHNICITY2") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_ETHNICITY_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="AGE2") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("advanced_stage_by_AGE_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="REGION") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("Early_stage_by_region_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="IMD2015_1") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("Early_stage_by_IMD_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="ETHNICITY2") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("Early_stage_by_ETHNICITY_16MAR.docx")
+
+regression_data2 %>% 
+  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(AGE=as.numeric(AGE)) %>%
+  filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
+  tbl_summary(by="AGE2") %>% 
+  add_overall() %>% 
+  add_ci() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("Early_stage_by_AGE_16MAR.docx")
 ```
 
