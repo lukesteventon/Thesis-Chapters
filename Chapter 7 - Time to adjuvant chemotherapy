@@ -923,6 +923,16 @@ tabledata<-tabledata%>%
 tabledata%>%
   as_gt() %>% 
   gt::gtsave("tableone_before_imputation.docx")
+
+tabledata2<-tabledata%>%
+  tbl_summary(by="adjuvantbreakcategory",missing_text="(Missing)") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+tabledata2%>%
+  as_gt() %>% 
+  gt::gtsave("tableone_by_adjuvantbreak.docx")
 ```
 
 MICE: Select variables for multiple imputation. This is to impute the BMI and PS values for patients with missing height and weight data, to incorprate into survival analysis. 
