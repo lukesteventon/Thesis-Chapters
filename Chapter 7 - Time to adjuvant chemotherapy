@@ -1105,6 +1105,30 @@ ethnicity_CATEGORY<-cohort %>%
 ethnicity_CATEGORY%>%
   as_gt() %>% 
   gt::gtsave("adjuvanttimebyethnicity_category.docx")
+
+ethnicityPDS<-cohort %>% 
+filter(modality=="PDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by="ETHNICITY2") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+ethnicityPDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyethnicity_PDS.docx")
+
+ethnicityIDS<-cohort %>% 
+filter(modality=="IDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by="ETHNICITY2") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+ethnicityIDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyethnicity_IDS.docx")
 ```
 
 Outcome 1b: Comparison of median time from surgery to adjuvant chemotherapy by age category:
@@ -1119,6 +1143,30 @@ age<-cohort %>%
 age%>%
   as_gt() %>% 
   gt::gtsave("adjuvanttimebyage.docx")
+
+age_PDS<-cohort %>% 
+filter(modality=="PDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by="AGECATEGORY") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+age_PDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyage_PDS.docx")
+
+age_IDS<-cohort %>% 
+filter(modality=="IDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by="AGECATEGORY") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+age_IDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyage_IDS.docx")
 ```
 
 Outcome 1c: Comparison of median time from surgery to adjuvant chemotherapy by IMD:
@@ -1134,6 +1182,32 @@ imd<-cohort %>%
 imd%>%
   as_gt() %>% 
   gt::gtsave("adjuvanttimebyIMD.docx")
+
+imd_PDS<-cohort %>% 
+  ungroup() %>% 
+filter(modality=="PDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>%  
+  tbl_summary(by="IMD2015_1") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+imd_PDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyIMD_PDS.docx")
+
+imd_IDS<-cohort %>% 
+  ungroup() %>% 
+filter(modality=="IDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>%  
+  tbl_summary(by="IMD2015_1") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+imd_IDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyIMD_IDS.docx")
 ```
 
 Outcome 1d: Compare time to surgery by region:
@@ -1149,6 +1223,32 @@ region<-cohort %>%
 region%>%
   as_gt() %>% 
   gt::gtsave("adjuvanttimebyregion.docx")
+
+region_PDS<-cohort %>% 
+   ungroup() %>% 
+filter(modality=="PDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by=REGION) %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+region_PDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyregion_PDS.docx")
+
+region_IDS<-cohort %>% 
+   ungroup() %>% 
+filter(modality=="IDS")%>% 
+ select(modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, REGION, CENTRETYPE) %>% 
+  tbl_summary(by=REGION) %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+region_IDS%>%
+  as_gt() %>% 
+  gt::gtsave("adjuvanttimebyregion_IDS.docx")
 ```
 
 Index date is the first treatment after chemo for PDS and IDS patients.
