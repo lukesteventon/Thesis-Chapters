@@ -808,7 +808,7 @@ extra_variables<-cohort_with_admission4 %>%
   group_by(PSEUDO_PAT) %>% 
   mutate(difftime=difftime(VITALSTATUSDATE, firstadmissiondate, units = "days")) %>% 
   mutate(notreatmentafteradmission=ifelse(treatmentsafteradmission==0,1,NA)) %>% 
-  mutate(diedduringadmission=ifelse(difftime<30&difftime>-1,1,NA)) %>% 
+  mutate(diedduringadmission=ifelse(difftime<30&difftime>-1&str_detect(VITALSTATUS,"D"),1,NA)) %>% 
   fill(notreatmentafteradmission,.direction="updown") %>% 
   fill(diedduringadmission,.direction="updown") %>% 
   mutate(notreatmentafteradmission=ifelse(is.na(notreatmentafteradmission),0,notreatmentafteradmission)) %>% 
