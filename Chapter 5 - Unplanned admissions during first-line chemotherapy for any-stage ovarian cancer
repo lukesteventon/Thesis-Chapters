@@ -616,6 +616,9 @@ Outcome 1: Defined unplanned admission within 30 days of initiation of first-lin
 cohort %>% 
   count(PSEUDO_PAT) #n=14,671
 
+hes_data %>% 
+  count(PSEUDO_PAT) #n=XXXX/14,671
+
 #Link to HES data for all interactions. Index date and unplanned admission dates can then be compared.
 cohort_with_admissions<-cohort %>% 
   group_by(PSEUDO_PAT) %>% 
