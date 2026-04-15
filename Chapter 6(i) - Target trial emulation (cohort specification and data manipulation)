@@ -975,6 +975,27 @@ ovariansurgerycohort %>%
   summary() #Median survival in patients who died (1423 iqr 824-2074) 
 ```
 
+Table one before imputation:
+```{r}
+cohort_before_imputation<-cohort %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(`Early discontinuation`=ifelse(total_cycles<6,"Early discontinuation", "Completed")) %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(BMI2=ifelse(BMI<18.5,"Underweight",NA)) %>% 
+    mutate(BMI2=ifelse(BMI>18.499&BMI<25.0001,"Normal weight",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI<30.00&BMI>25.00001,"Overweight",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
+    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
+ # select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, #BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, EGION, CENTRETYPE) %>% 
+  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+  tbl_summary(by=`Early discontinuation`) 
+```
+
+
 Calculate BMI and impute:
 
 ```{r}
@@ -1133,6 +1154,30 @@ cohort %>%
 
   as_gt() %>% 
   gt::gtsave("study2_summary.docx")
+#Table data before imputation
+cohort_before_imputation %>% 
+  left_join(cohort,by="PSEUDO_PAT") %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(`Early discontinuation`=ifelse(total_cycles<6,"Early discontinuation", "Completed")) %>% 
+  ungroup() %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(BMI=as.numeric(BMI)) %>% 
+  mutate(BMI2=ifelse(BMI<18.5,"Underweight",NA)) %>% 
+    mutate(BMI2=ifelse(BMI>18.499&BMI<25.0001,"Normal weight",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI<30.00&BMI>25.00001,"Overweight",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI<40.001&BMI>29.99999999999,"Obese",BMI2)) %>% 
+  mutate(BMI2=ifelse(BMI>40.0,"Morbidly obese",BMI2)) %>% 
+    mutate(ETHNICITY2=ifelse(str_detect(ETHNICITYNAME,"White"),"White","Non-white")) %>% 
+ # select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, #BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, EGION, CENTRETYPE) %>% 
+  select(`Early discontinuation`,AGE,AGECATEGORY,STAGE_BEST_CLEAN, BMI, BMI2,IMD2015_1,total_cycles,ETHNICITYNAME,ETHNICITY2, REGION, CENTRETYPE,regimen,maintenanceflag,yearoftreatment,GRADE, HISTOLOGY_CODED_DESC) %>% 
+  tbl_summary(by=`Early discontinuation`) %>% 
+  add_overall() %>% 
+  add_p() %>% 
+    add_ci() %>% 
+
+  as_gt() %>% 
+  gt::gtsave("study2_summary_before_imputation.docx")
 
 cohort %>% 
   group_by(PSEUDO_PAT) %>% 
