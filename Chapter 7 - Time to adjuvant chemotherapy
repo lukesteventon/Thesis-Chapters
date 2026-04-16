@@ -899,37 +899,37 @@ ients have survival status missing
 Create table one by surgical status. This includes imputed data.
 ```{r}
 tabledata<-cohort
-
+ 
 tabledata<-tabledata %>% 
- select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
+select(PSEUDO_PAT,modality,STAGE_BEST_CLEAN, adjuvantbreak, adjuvantbreakcategory,overall_survival,EVENT,PS, bevflag, BMI,BMI2, ETHNICITY2,ethnicitygroup, AGECATEGORY,AGE,AGECATEGORY, IMD2015_1, `Commissioning region`, CENTRE_TYPE) %>% 
   mutate(adjuvantbreak=as.numeric(adjuvantbreak)) %>% 
   mutate(AGE=as.numeric(AGE))
-
+ 
 tabledata<-tabledata%>% 
   select(-PSEUDO_PAT) %>% 
-  mutate(BMI=as.numeric(BMI)) 
-
+  mutate(BMI=as.numeric(BMI))
+ 
 tabledata$BMI2<-cut(tabledata$BMI, breaks=c(0,18.5,25,30,40,99), right = FALSE)
 tabledata$AGE2<-cut(tabledata$AGE, breaks=c(0,50,60,70,150), right = FALSE)
 tabledata$AGE2<-as.factor(tabledata$AGE2)
 tabledata$AGE2<-relevel(tabledata$AGE2, ref = "[0,50)")
-
-tabledata<-tabledata%>%
+ 
+tabledata1<-tabledata%>%
   tbl_summary(by="modality",missing_text="(Missing)") %>% 
   add_p() %>% 
   add_n() %>% 
   add_overall()
-
-tabledata%>%
+ 
+tabledata1%>%
   as_gt() %>% 
   gt::gtsave("tableone_before_imputation.docx")
-
+ 
 tabledata2<-tabledata%>%
   tbl_summary(by="adjuvantbreakcategory",missing_text="(Missing)") %>% 
   add_p() %>% 
   add_n() %>% 
   add_overall()
-
+ 
 tabledata2%>%
   as_gt() %>% 
   gt::gtsave("tableone_by_adjuvantbreak.docx")
@@ -1328,6 +1328,14 @@ coxtable2 %>%
   as_gt() %>% 
   gt::gtsave("cox_adjuvant_time_continuous.docx")
 ```
+Overall OS for all patients irrespective of surgery:
+```{r}
+cohortsurvival$forKM<-with(cohortsurvival, Surv(overall_survival, EVENT==1))
+fit<-survfit(forKM~1, data=cohortsurvival)
+fit
+#       n events median 0.95LCL 0.95UCL
+#[1,] 4434   2468   1085    1051    1124
+```
 
 
 KM curve for PDS only:
@@ -1363,6 +1371,17 @@ kmcurvePDS
 
 summary(kmcurvePDS)
 
+#Survival overall for PDS
+survfit(Surv(overall_survival, EVENT),data= pds_analysis)
+pds_analysis$forKM<-with(pds_analysis, Surv(overall_survival, EVENT==1))
+fit<-survfit(forKM~1, data=pds_analysis)
+summary(fit)
+
+#Median OS for all PDS patients = 4.96 years, (4.5, NA)
+```
+
+
+```{r}
 kmcurveplot_PDS<-ggsurvplot(kmcurvePDS,
            pval=F,
            conf.int=TRUE,
@@ -1411,7 +1430,15 @@ kmcurveIDS
 #adjuvantbreakcategory=[0,43)   1943   1328   2.38    2.27    2.52
 #adjuvantbreakcategory=[43,181)  628    427   2.16    1.92    2.37
 
-summary(kmcurveIDS)
+#Survival overall for PDS
+survfit(Surv(overall_survival, EVENT),data= ids_analysis)
+ids_analysis$forKM<-with(ids_analysis, Surv(overall_survival, EVENT==1))
+fit<-survfit(forKM~1, data=ids_analysis)
+fit
+#Median OS for IDS = 2.33 years (2.25, 2.42)
+#        n events median 0.95LCL 0.95UCL
+#[1,] 2573   1755   2.33    2.25    2.42
+
 
 kmcurveplot_IDS<-ggsurvplot(kmcurveIDS,
            pval=F,
@@ -1464,4 +1491,3 @@ coxtable_IDS_only%>%
   as_gt() %>% 
   gt::gtsave("cox_regression_IDS_only.docx")
 ```
-
