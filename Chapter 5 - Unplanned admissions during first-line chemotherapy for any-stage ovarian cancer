@@ -1354,7 +1354,7 @@ Further analyses by early- vs advanced-stage:
 regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
   mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
@@ -1373,7 +1373,7 @@ Analysis for advanced stage only
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="surgery") %>% 
@@ -1385,7 +1385,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (all surgery)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%
@@ -1405,7 +1405,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (PDS)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="PDS") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -1424,7 +1424,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (IDS)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="IDS") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -1443,7 +1443,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (No surgery)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="No surgery") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -1466,7 +1466,7 @@ Further glm for each advanced setting
 advanced_stage<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage") %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
@@ -1507,7 +1507,7 @@ Analyse early stage by surgery
 
 #Time to admission in early stages
 regression_data2 %>% 
-    mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Early stage") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -1527,7 +1527,7 @@ regression_data2 %>%
 early_stage<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Early stage") %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
@@ -1579,13 +1579,13 @@ Analysis by PS:
 ps_data<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="PS2") %>% 
@@ -3061,7 +3061,7 @@ Further analyses by early- vs advanced-stage:
 regression_data2 %>% 
 distinct(PSEUDO_PAT,.keep_all=T) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
   mutate(admission_before_chemotherapy=ifelse(is.na(admission_before_chemotherapy),0,admission_before_chemotherapy)) %>% 
@@ -3080,7 +3080,7 @@ Analysis for advanced stage only
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="surgery") %>% 
@@ -3092,7 +3092,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (all surgery)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%
@@ -3112,7 +3112,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (PDS)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="PDS") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -3131,7 +3131,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (PDS)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="IDS") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -3150,7 +3150,7 @@ regression_data2 %>%
 
 #Time to admission in advanced stages (PDS)
 regression_data2 %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage"&surgery=="No surgery") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -3170,7 +3170,7 @@ regression_data2 %>%
 advanced_stage<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Advanced stage") %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
@@ -3210,7 +3210,7 @@ Analyse early stage by surgery
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="surgery") %>% 
@@ -3222,7 +3222,7 @@ regression_data2 %>%
 
 #Time to admission in early stages
 regression_data2 %>% 
-    mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Early stage") %>% 
   mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
   filter(admission_within_30_days==1&indextoadmission>-1&indextoadmission<31) %>%#This isolates the admissions within 30 days of starting SACT,n=4585
@@ -3242,7 +3242,7 @@ regression_data2 %>%
 early_stage<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   filter(STAGE=="Early stage") %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
@@ -3294,13 +3294,13 @@ Analysis by PS:
 ps_data<-regression_data2 %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(admission_within_30_days=as.numeric(admission_within_30_days))
 
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="PS2") %>% 
@@ -3426,7 +3426,7 @@ Summary tables stratified by admission for each surgery setting:
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage"&surgery=="PDS") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="admission_within_30_days") %>% 
@@ -3439,7 +3439,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage"&surgery=="IDS") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="admission_within_30_days") %>% 
@@ -3452,7 +3452,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage"&surgery=="No surgery") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="admission_within_30_days") %>% 
@@ -3465,7 +3465,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="admission_within_30_days") %>% 
@@ -3482,7 +3482,7 @@ Further tables 17MAR26
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="STAGE_BEST_CLEAN") %>% 
@@ -3495,7 +3495,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="STAGE_BEST_CLEAN") %>% 
@@ -3508,7 +3508,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="REGION") %>% 
@@ -3521,7 +3521,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="IMD2015_1") %>% 
@@ -3534,7 +3534,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="ETHNICITY2") %>% 
@@ -3547,7 +3547,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Advanced stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="AGE2") %>% 
@@ -3560,7 +3560,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="REGION") %>% 
@@ -3573,7 +3573,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="IMD2015_1") %>% 
@@ -3586,7 +3586,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="ETHNICITY2") %>% 
@@ -3599,7 +3599,7 @@ regression_data2 %>%
 regression_data2 %>% 
   select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>% 
   mutate(BMI=as.numeric(BMI)) %>% 
-  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"1|2"),"Early stage", "Advanced stage")) %>% 
+  mutate(STAGE=ifelse(str_detect(STAGE_BEST_CLEAN,"2B|3|3A|3B|3C|4|4A|4B|4C"),"Advanced stage", "Early stage")) %>% 
   mutate(AGE=as.numeric(AGE)) %>%
   filter(STAGE=="Early stage") %>%  select(admission_within_30_days,admission_before_chemotherapy,surgery,AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment,notreatmentafteradmission,diedduringadmission) %>%
   tbl_summary(by="AGE2") %>% 
