@@ -56,17 +56,18 @@ trial_function<-function(sample_data){
   less_than_six_cycles%>% select(ID,interval, censor, discontinuation, maxcycle,numberofcycles)
   less_than_six_cycles %>% select(time,timesq,time_strategy,timesq_strategy,BMI,ETHNICITY,AGE,STAGE,DEPRIVATION)
   #Logistic regression for probability of remaining uncensored at each time point
-  #sixcycles$probability_of_uncensoring<-glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles$probability_of_uncensoring)
-  
+  #sixcycles$probability_of_uncensoring<-glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles$probability_of_uncensoring)
+  #Maintenance flag was removed as this is given post first-line chemotherapy and is there a post-baseline exposure and shouldn't be incorporated into IPCW. Comment on this in the manuscript.
   sixcycles %>% 
     skimr::skim()
   
   
   #This logistic regression produces coefficients for covariates and the probabilty of remaining uncensored (i.e. remaining in the study)
-  probability_of_uncensoring_sixcycles<-suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
+  probability_of_uncensoring_sixcycles<-suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
                                                                REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles))
-  
-  
+  #Maintenance flag was removed as this is given post first-line chemotherapy and is there a post-baseline exposure and shouldn't be incorporated into IPCW. Comment on this in the manuscript.
+
+
   summary(probability_of_uncensoring_sixcycles)  
   sixcycles <- sixcycles %>% 
     mutate(p1=predict(probability_of_uncensoring_sixcycles, type = "response")) #This line creates a new column with 
@@ -97,7 +98,7 @@ trial_function<-function(sample_data){
   #      1%         50%          75%          90%           95%           99%         100% 
   # 1.000000    1.143339     1.216786      1.291885       1.352053     1.507941     1.507941
   #Logistic regression for probability of remaining uncensored at each time point
-  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+maintenanceflag+
+  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
                                                                          REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
   
   less_than_six_cycles<-less_than_six_cycles %>% 
@@ -154,19 +155,19 @@ trial_function<-function(sample_data){
   
   #Logistic regression for probability of surviving at each time point.
   #need to ensure that all variables are either numeric or factors - glm cant handle #characters
-  survival_curve_model<-glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+maintenanceflag+
+  survival_curve_model<-glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+
                               REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "binomial")
   
   #Olivia code for survival analysis
   completion_df <- combined_dataset %>%
     mutate(row=interval) %>% 
-    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,maintenanceflag,
+    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,
                   REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
     filter(strategy==1) #Completion
   
   discontinuation_df <- combined_dataset %>%
     mutate(row=interval) %>% 
-    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,maintenanceflag,
+    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,
                   REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
     filter(strategy==0) #Discontinuation
   
