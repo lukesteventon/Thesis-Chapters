@@ -2262,12 +2262,12 @@ loveplotdata<-cohort %>%
  rename("Region"=REGION) %>% 
  #rename('Grade'=GRADE) %>% 
   rename("Year of treatment"=yearoftreatment) %>% 
- rename("Maintenance therapy"=maintenanceflag) %>% 
- select(Age, 'Cancer stage',"Maintenance therapy", "Body mass index", "Index of multiple deprivation","Year of treatment", Ethnicity, 'Centre type', Region,IPCW,strategy) %>% 
+ #rename("Maintenance therapy"=maintenanceflag) %>% 
+ select(Age, 'Cancer stage', "Body mass index", "Index of multiple deprivation","Year of treatment", Ethnicity, 'Centre type', Region,IPCW,strategy) %>% 
   mutate(IPCW=as.numeric(IPCW)) 
 
 PLOT<-bal.tab(loveplotdata$strategy
- ~ Age +`Cancer stage`+ `Maintenance therapy`+ `Body mass index`+ `Index of multiple deprivation`+ `Year of treatment`+Ethnicity+ `Centre type`+ Region , data = loveplotdata,
+ ~ Age +`Cancer stage`+ ``Body mass index`+ `Index of multiple deprivation`+ `Year of treatment`+Ethnicity+ `Centre type`+ Region , data = loveplotdata,
         weights = "IPCW",
         disp = c("means", "sdm"), un = TRUE, 
         stats = c("mean.diffs"))
@@ -2302,7 +2302,7 @@ combined_dataset<-combined_data %>%
 
 #Logistic regression for probability of surviving at each time point
 survival_curve_model<-glm(survivalmarker~time+timesq+strategy+BMI+
-+REGION+TREATINGCENTRETYPE+ETHNICITY2+AGE+STAGE+DEPRIVATION+maintenanceflag+yearoftreatment,data=combined_dataset, weights=IPCW,family = "quasibinomial"())
++REGION+TREATINGCENTRETYPE+ETHNICITY2+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "quasibinomial"())
 
 combined_dataset %>% 
   distinct(PSEUDO_PAT,survivalmarker) %>% 
