@@ -1,0 +1,99 @@
+continuation_df <- long_format %>%
+  filter(followup_curve == 1) %>%
+  mutate(treatment = "continuation")
+
+tapering_df <- long_format %>%
+  filter(followup_curve == 1) %>%
+  mutate(treatment = "tapering")
+
+# create hazards under each strategy
+tapering_df$hazard1 <- predict(survival_curve_model, newdata=tapering_df, type="response")
+continuation_df$hazard0 <- predict(survival_curve_model, newdata=continuation_df, type="response")
+
+# calculate survival from the cumulative of 1-hazard
+tapering_df <- tapering_df %>%
+  group_by(patid) %>%
+  mutate(survival1 = cumprod(1-hazard1)) %>%
+  ungroup()
+
+continuation_df <- continuation_df %>%
+  group_by(patid) %>%
+  mutate(survival0 = cumprod(1-hazard0)) %>%
+  ungroup()
+
+# estimate risks as 1-survival
+tapering_df <- tapering_df %>%
+  mutate(risk1 = 1-survival1)
+
+continuation_df <- continuation_df %>%
+  mutate(risk0 = 1-survival0)
+
+# calculate mean for each time point
+tapering_risk <- tapering_df %>%
+  group_by(t, treatment) %>%
+  summarise(risk = mean(risk1),
+            survival = mean(survival1),
+            hazard = mean(hazard1))
+
+continuation_risk <- continuation_df %>%
+  group_by(t, treatment) %>%
+  summarise(risk = mean(risk0),
+            survival = mean(survival0),
+            hazard = mean(hazard0))
+
+risk_curves <- full_join(tapering_risk, continuation_risk)
+
+
+.....
+
+risk_df <- data.frame(
+  estimate_hr = hazard_ratio_estimate,
+  risk_ratio_12months = risk_ratio_12,
+  risk_ratio_24months = risk_ratio_24,
+  risk_diff_12months = risk_diff_12,
+  risk_diff_24months = risk_diff_24,
+  abs_risk_continuation_12 = continuation_risk_12,
+  abs_risk_continuation_24 = continuation_risk_24,
+  abs_risk_tapering_12 = tapering_risk_12, 
+  abs_risk_tapering_24 = tapering_risk_24
+)
+rownames(risk_df) <- NULL
+
+if(full_sample == TRUE){
+  fwrite(risk_df, paste0("analysis_results/Tapering Trials/", time_period, "/risk_estimates/stroke.csv"))
+}
+
+risk_curves <- risk_curves %>%
+  mutate(risk=risk*100)
+
+risk_curves <- rbind(
+  risk_curves,
+  data.frame(t = 0, risk = 0, treatment = "continuation"),
+  data.frame(t = 0, risk = 0, treatment = "tapering")
+)
+
+# Plot the survival curves
+survival_curve_plot <- ggplot(risk_curves, aes(x = t, y = risk, color = treatment)) +
+  geom_line(linewidth=1)+
+  labs(
+    title = "Stroke Cumulative Incidence Curves by Treatment",
+    x = "Time (months)",
+    y = "Cumulative Incidence (%)",
+    color = "Treatment"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text = element_text(size = 14),     # tick label size
+    axis.title = element_text(size = 16),    # axis title size
+    axis.ticks = element_line(linewidth = 0.8),
+    axis.ticks.length = unit(0.25, "cm"),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 13),
+    plot.title = element_text(size = 16, face = "bold")
+  ) +
+  # vertical line at end of grace period
+  geom_vline(xintercept = 6, 
+             linetype = "dashed", 
+             linewidth = 1,
+             color = "black") +
+  ylim(0, 32)
