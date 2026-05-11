@@ -291,6 +291,13 @@ cohort3 %>%
   count(PSEUDO_PAT)#n=8 patients with missing centre type
 ```
  
+Update: Can you identify emergency diagnoses through NCRD?
+```{r}
+cohort3 %>% 
+  select(DIAGNOSIS_DATE, DIAGNOSTIC_ROUTE) #Check if there is a column describing route to diagnosis
+```
+
+
 ###########################################################################
 ###########################################################################
 ###########################################################################
@@ -329,10 +336,29 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   rename(DAYSFROMPREVIOUSADMIN=DAYSFROMPREVIOUSADMIN.y) %>% 
   group_by(PSEUDO_PAT) %>% 
   fill(lineoftherapy,.direction = "down") %>% 
-  mutate(lineoftherapy=ifelse(is.na(lineoftherapy),1,lineoftherapy)) 
+  mutate(lineoftherapy=ifelse(is.na(lineoftherapy),1,lineoftherapy)) %>% 
+  filter(lineoftherapy==1)#retain only first-line chemo
 
 ovariansurgerycohort %>%count(PSEUDO_PAT) #n=17,804
 ```
+
+Mutate cycle numbers:
+CHECK this working properly
+```{r}
+ovariansurgerycohort %>% 
+group_by(PSEUDO_PAT) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP,.keep_all=T) %>% 
+  mutate(DAYSFROMPREVIOUSADMIN=difftime(ADMINISTRATION_DATE, lag(ADMINISTRATION_DATE), units = "days")) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE,.keep_all=T) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(CYCLE_NUMBER=row_number()) %>% 
+  mutate(CYCLE_NUMBER=ifelse(DAYSFROMPREVIOUSADMIN<9,lag(CYCLE_NUMBER),CYCLE_NUMBER)) %>% 
+  select(PSEUDO_PAT, ADMINISTRATION_DATE,CYCLE_NUMBER, lineoftherapy) %>% 
+  right_join(ovariansurgerycohort, by =c("PSEUDO_PAT", "ADMINISTRATION_DATE"))
+```
+
+
 
 #n=17,804
 Calculate time from diagnosis to first SACT and exclude those not treated within 90 days. This is the expected time frame based on Shibani's comment. This improves the data quality by ensuring that patients received SACT within 3 months and therefore that the first record of SACT in the dataset was given in the first line.
@@ -422,172 +448,175 @@ HES_chemo %>%
 ###########################################################################
 ###########################################################################
 
+
+
+
 Study outcomes:
 Outcome 1: Hospitalisations or unplanned attendance within 30 days of cycle 1 of SACT:
 ```{r}
 filter_list<-ovariansurgerycohort %>% distinct(PSEUDO_PAT)
 #Read HES APC data;
-#HESADMISSION1<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_22_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-#  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
-#HESADMISSION2<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1013_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-# # select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
-#HESADMISSION3<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1316_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-#  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
-#HESADMISSION4<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1619_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-#  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
-#HESADMISSION5<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1921_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)#%>% 
-#  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
-##Read in HES diagnostic information
-#HESDIAG1<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1011_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG2<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1112_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG3<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1213_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG4<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1314_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG5<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1415_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG6<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1516_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG7<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1617_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG8<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1718_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG9<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1819_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG10<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1920_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG12<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG2021_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-#HESDIAG13<-read_csv(
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG2122_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-##Bind all HES APC records
-#HES_APC_all<-rbind(HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5)%>% 
-#  merge(filter_list,by="PSEUDO_PAT") #Select only records for included patients to improve processing time
-##Bind all HES APC diagnostic information
-#HES_APC_DIAG_ALL<-rbind(HESDIAG1,HESDIAG2,HESDIAG3,HESDIAG4,HESDIAG5,HESDIAG6,HESDIAG7,HESDIAG8,HESDIAG9,HESDIAG10,HESDIAG12,HESDIAG13#) %>% 
-#  merge(filter_list,by="PSEUDO_PAT") #Select only records for included patients to improve processing time
-#
-##Remove dataframes once linked to the study cohort data.
-#rm(HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5)
-#rm(HESDIAG1,HESDIAG2,HESDIAG3,HESDIAG4,HESDIAG5,HESDIAG6,HESDIAG7,HESDIAG8,HESDIAG9,HESDIAG10,HESDIAG12,HESDIAG13)
-#
-##Merge HES APC records to the HES APC diagnostic information
-#HES_APC_all_data<-HES_APC_DIAG_ALL %>% 
-#  merge(HES_APC_all, by = c("PSEUDO_PAT","DATAYEAR" ,"PSEUDO_EPIKEYANON"))
-#
-#HES_APC_all_data %>% 
-#  count(PSEUDO_PAT) #n=14,704 of 14,730 patients have a record in HES APC (99.8%)
-#
-##Write data including admitted patient care records
-#HES_APC_all_data %>% 
-#  write_csv("HES_APC_study1.csv")
+HESADMISSION1<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_22_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+HESADMISSION2<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1013_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+ # select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+HESADMISSION3<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1316_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+HESADMISSION4<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1619_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+HESADMISSION5<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_1921_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)#%>% 
+  #select(PSEUDO_PAT, ADMIDATE,ADMIMETH)
+#Read in HES diagnostic information
+HESDIAG1<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1011_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG2<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1112_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG3<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1213_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG4<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1314_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG5<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1415_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG6<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1516_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG7<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1617_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG8<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1718_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG9<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1819_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG10<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG1920_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG12<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG2021_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+HESDIAG13<-read_csv(
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAPC_DIAG2122_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+#Bind all HES APC records
+HES_APC_all<-rbind(HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5)%>% 
+  merge(filter_list,by="PSEUDO_PAT") #Select only records for included patients to improve processing time
+#Bind all HES APC diagnostic information
+HES_APC_DIAG_ALL<-rbind(HESDIAG1,HESDIAG2,HESDIAG3,HESDIAG4,HESDIAG5,HESDIAG6,HESDIAG7,HESDIAG8,HESDIAG9,HESDIAG10,HESDIAG12,HESDIAG13) %>% 
+  merge(filter_list,by="PSEUDO_PAT") #Select only records for included patients to improve processing time
+
+#Remove dataframes once linked to the study cohort data.
+rm(HESADMISSION1,HESADMISSION2,HESADMISSION3,HESADMISSION4,HESADMISSION5)
+rm(HESDIAG1,HESDIAG2,HESDIAG3,HESDIAG4,HESDIAG5,HESDIAG6,HESDIAG7,HESDIAG8,HESDIAG9,HESDIAG10,HESDIAG12,HESDIAG13)
+
+#Merge HES APC records to the HES APC diagnostic information
+HES_APC_all_data<-HES_APC_DIAG_ALL %>% 
+  merge(HES_APC_all, by = c("PSEUDO_PAT","DATAYEAR" ,"PSEUDO_EPIKEYANON"))
+
+HES_APC_all_data %>% 
+  count(PSEUDO_PAT) #n=14,704 of 14,730 patients have a record in HES APC (99.8%)
+
+#Write data including admitted patient care records
+HES_APC_all_data %>% 
+  write_csv("HES_APC_study1.csv")
 ```
 
 Then link the HES A&E datasets to the study cohort.
 ```{r}
 #Read HES A&E data
-#HESAE<-read_csv(#Contains visit records
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAE_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL) %>% 
-#  select(PSEUDO_PAT,PSEUDO_AEKEYANON,DATAYEAR, ARRIVAL_DATE,PSEUDO_AEKEYANON)
-#HESAEDIAG<-read_csv(#Contains diagnostic information
-#  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAE_DIAG_2019Data.csv",
-#  col_names = TRUE,
-#  col_types = cols(.default = col_character()),
-#  col_select = NULL)
-##Merge A&E visits and diagnostic information together by PSEUDO_PAT, DATAYEAR and AEKEYANON (visit ID)
-#HESAE_merged<-HESAE %>% 
-#  merge(HESAEDIAG, by = c("PSEUDO_PAT","DATAYEAR","PSEUDO_AEKEYANON"))
-#
-#HESAE_merged %>% 
-#  merge(filter_list, by="PSEUDO_PAT") %>% 
-#  count(PSEUDO_PAT) #n=10,655 of 14,730 have a record in HES A&E
+HESAE<-read_csv(#Contains visit records
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAE_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) %>% 
+  select(PSEUDO_PAT,PSEUDO_AEKEYANON,DATAYEAR, ARRIVAL_DATE,PSEUDO_AEKEYANON)
+HESAEDIAG<-read_csv(#Contains diagnostic information
+  "K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions//ODR1920_080_HESAE_DIAG_2019Data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+#Merge A&E visits and diagnostic information together by PSEUDO_PAT, DATAYEAR and AEKEYANON (visit ID)
+HESAE_merged<-HESAE %>% 
+  merge(HESAEDIAG, by = c("PSEUDO_PAT","DATAYEAR","PSEUDO_AEKEYANON"))
+
+HESAE_merged %>% 
+  merge(filter_list, by="PSEUDO_PAT") %>% 
+  count(PSEUDO_PAT) #n=10,655 of 14,730 have a record in HES A&E
 ```
 
 Cleaning of HES data:
 ```{r}
 #Assign unplanned admission according to ADMIMETH code
-#unplanned_admissions<-HES_APC_all %>% 
-#  ungroup() %>% 
-#  mutate(Admission=ifelse(str_detect(ADMIMETH,"11|12|13"),"Planned","Unplanned")) #Adjust for #term in the dataset to specify #unplanned admission
-# 
-##Assign A&E admission to all A&E data and recode columns
-#HESAE_merged<-HESAE_merged %>% 
-#  mutate(ADMIDATE=ARRIVAL_DATE) %>% 
-#  mutate(ADMIMETH="A&E") %>% 
-#  mutate(Admission="Unplanned") %>% 
-#  select(PSEUDO_PAT, ADMIDATE, ADMIMETH,Admission, DATAYEAR)
-#
-##Bind data
-#unplanned_APC<-unplanned_admissions %>% 
-#  select(PSEUDO_PAT, ADMIDATE, ADMIMETH,Admission, DATAYEAR)
-#all_HES<-rbind(unplanned_APC,HESAE_merged)
-#
-##Then link diagnostic codes
-#final_hes_data<-HES_APC_all_data %>% 
-#  right_join(all_HES, by = c("PSEUDO_PAT","DATAYEAR","ADMIDATE","ADMIMETH"))
-#final_hes_data %>% 
-#  write_csv("study1_hes_data.csv")
+unplanned_admissions<-HES_APC_all %>% 
+  ungroup() %>% 
+  mutate(Admission=ifelse(str_detect(ADMIMETH,"11|12|13"),"Planned","Unplanned")) #Adjust for #term in the dataset to specify unplanned admission
+ 
+#Assign A&E admission to all A&E data and recode columns
+HESAE_merged<-HESAE_merged %>% 
+  mutate(ADMIDATE=ARRIVAL_DATE) %>% 
+  mutate(ADMIMETH="A&E") %>% 
+  mutate(Admission="Unplanned") #%>% 
+  #select(PSEUDO_PAT, ADMIDATE, ADMIMETH,Admission, DATAYEAR)
+
+#Bind data
+unplanned_APC<-unplanned_admissions %>% 
+  #select(PSEUDO_PAT, ADMIDATE, ADMIMETH,Admission, DATAYEAR)
+all_HES<-rbind(unplanned_APC,HESAE_merged)
+
+#Then link diagnostic codes
+final_hes_data<-HES_APC_all_data %>% 
+  right_join(all_HES, by = c("PSEUDO_PAT","DATAYEAR","ADMIDATE","ADMIMETH"))
+final_hes_data %>% 
+  write_csv("study1_hes_data.csv")
 ```
 
 
@@ -600,7 +629,8 @@ cohort<-read_csv(
   col_names = TRUE,
   col_types = cols(.default = col_character()),
   col_select = NULL) %>% 
-  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) 
+  mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
+  mutate(DIAGNOSIS_DATE=dmy(DIAGNOSIS_DATE))
 
 hes_data<-read_csv(
   "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Unplanned admissions during first-line chemotherapy\\study1_hes_data.csv",
@@ -608,7 +638,20 @@ hes_data<-read_csv(
   col_types = cols(.default = col_character()),
   col_select = NULL) %>% 
   mutate(ADMIDATE=dmy(ADMIDATE)) %>% 
-   mutate(DISDATE=dmy(DISDATE)) 
+  mutate(DISDATE=dmy(DISDATE)) 
+```
+
+Define emergency admissions in the 28 days before diagnosis:
+```{r}
+ovariansurgerycohort %>% 
+  group_by(PSEUDO_PAT)  %>% 
+  mutate(emergency_before_diag=difftime(DIAGNOSISDATE, ADMIDATE)) %>% 
+  mutate(admission_before_diagnosis=ifelse(emergency_before_diag<0&emergency_before_diag>-29&Admission=="Unplanned", 1, NA)) %>%
+  mutate(number_of_admissions_before_diagnosis=sum(admission_before_diagnosis)) %>% 
+  mutate(time_from_emergency_to_diagnosis=ifelse(admission_before_diagnosis==1),emergency_before_diag) %>% 
+  mutate(emergency_diagnosis=ifelse(!is.na(number_of_admissions_before_diagnosis),1,NA)) %>% 
+  ungroup()
+
 ```
 
 Outcome 1: Defined unplanned admission within 30 days of initiation of first-line chemotherapy:
@@ -632,14 +675,13 @@ cohort_with_admissions<-cohort %>%
 cohort_with_admission2<-cohort_with_admissions %>% 
   mutate(indextoadmission=as.numeric(difftime(ADMIDATE,index, units = "days"))) %>% 
   mutate(admission_within_30_days=ifelse(indextoadmission>-1&indextoadmission<31&Admission=="Unplanned", 1, NA)) %>% 
-  mutate(admission_before_chemotherapy=ifelse(indextoadmission<0&indextoadmission>-181&Admission=="Unplanned", 1, NA)) %>%
-    mutate(admission_before_chemotherapy_1month=ifelse(indextoadmission<0&indextoadmission>-31&Admission=="Unplanned", 1, NA)) %>% #Added - flags admissions up to 6 months before chemotherapy
+  mutate(admission_during_first_line_chemo=ifelse(indextoadmission>-1&indextoadmission<127&Admission=="Unplanned", 1, NA)) %>% 
+  mutate(admission_before_chemotherapy_1month=ifelse(indextoadmission<0&indextoadmission>-29&Admission=="Unplanned", 1, NA)) #to match NOCA analysis looking at emergency diagnosis in the 28 days before diagnosis %>% #Added - flags admissions up to 6 months before chemotherapy
 #Added - flags admissions up to 6 months before chemotherapy
   group_by(PSEUDO_PAT) %>% 
   fill(admission_within_30_days,.direction="updown") %>% 
-  fill(admission_before_chemotherapy,.direction="updown") %>% 
-    fill(admission_before_chemotherapy_1month,.direction="updown") %>% 
-
+  fill(admission_during_first_line_chemo,.direction="updown") %>% 
+  fill(admission_before_chemotherapy_1month,.direction="updown") %>% 
   #distinct(PSEUDO_PAT,.keep_all=T) %>% 
   ungroup()
 
@@ -660,6 +702,14 @@ admissionswithin30days
 #2754 of 14671 (18.8%) were admitted in the 6 months before starting chemotherapy and were then admitted in the first month after starting chemo
 
 #In total, 4,051/14,671 were admitted through unplanned routes within 30 days of first SACT (27.6%). This is the primary study outcome.
+
+#Count number of unplanned admissions in the standard first-line period
+admission_during_first_line_chemo<-cohort_with_admission2 %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(PSEUDO_PAT, admission_during_first_line_chemo, admission_before_chemotherapy_1month) %>% 
+  count(admission_during_first_line_chemo,admission_before_chemotherapy_1month)
+
+admission_during_first_line_chemo
 ```
 
 Write table describing ICD codes associated with the first admission:
@@ -754,7 +804,7 @@ cohort_with_admission3<-cohort_with_admission2 %>%
   arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
   mutate(ADMINISTRATION_DATE=as.Date(ADMINISTRATION_DATE)) %>% 
   #mutate(firstadmissiondate=min(firstadmissiondate)) %>% 
- filter(indextoadmission>-1&indextoadmission<31Admission=="Unplanned") %>% 
+ filter(indextoadmission>-1&indextoadmission<127&Admission=="Unplanned") %>% 
   mutate(firstadmissiondate=index+indextoadmission) %>% 
   arrange(PSEUDO_PAT, indextoadmission) %>% 
   arrange(PSEUDO_PAT, indextoadmission) %>% 
@@ -822,6 +872,23 @@ extra_variables<-cohort_with_admission4 %>%
   mutate(admission_before_chemotherapy_1month=ifelse(is.na(admission_before_chemotherapy_1month),0,admission_before_chemotherapy_1month))
 ```
 
+Calculate whether patient experienced 2-month mortality, stratified by emergency diagnosis or not:
+```{r}
+cohort_with_admission4<cohort_with_admission4 %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(twomonth_mortality=ifelse(difftime(VITALSTATUSDATE, DIAGNOSISDATEBEST, units = "days")<61,1,NA)) %>% 
+  ungroup()
+
+table<-cohort_with_admission4 %>%
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  select(emergency_diagnosis, twomonth_mortality) %>% 
+  tbl_summary(by="emergency_diagnosis") %>% 
+  add_p() %>% 
+  add_n() %>% 
+  add_overall()
+
+table
+```
 
 To link performance status, we must import the cycle tables. This is important to be incorporated into the multivariable logistic regression as this is known to be a significant factor affecting likelihood of hospital admission.
 ```{r}
@@ -2053,9 +2120,24 @@ ovariansurgerycohort<-ovariansurgerycohort %>%
   rename(DAYSFROMPREVIOUSADMIN=DAYSFROMPREVIOUSADMIN.y) %>% 
   group_by(PSEUDO_PAT) %>% 
   fill(lineoftherapy,.direction = "down") %>% 
-  mutate(lineoftherapy=ifelse(is.na(lineoftherapy),1,lineoftherapy)) 
+  mutate(lineoftherapy=ifelse(is.na(lineoftherapy),1,lineoftherapy)) %>% 
+  filter(lineoftherapy==1)#retain only first-line chemo
 
 ovariansurgerycohort %>%count(PSEUDO_PAT) #n=17,804
+```
+
+Mutate cycle number:
+```{r}
+ovariansurgerycohort %>% 
+group_by(PSEUDO_PAT) %>% 
+  arrange(PSEUDO_PAT, ADMINISTRATION_DATE) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE, DRUG_GROUP,.keep_all=T) %>% 
+  mutate(DAYSFROMPREVIOUSADMIN=difftime(ADMINISTRATION_DATE, lag(ADMINISTRATION_DATE), units = "days")) %>% 
+  distinct(PSEUDO_PAT, ADMINISTRATION_DATE,.keep_all=T) %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(CYCLE_NUMBER=row_number()) %>% 
+  mutate(CYCLE_NUMBER=ifelse(DAYSFROMPREVIOUSADMIN<9,lag(CYCLE_NUMBER),CYCLE_NUMBER)) %>% 
+  select(PSEUDO_PAT, ADMINISTRATION_DATE,DAYSFROMPREVIOUSADMIN, DRUG_GROUP,CYCLE_NUMBER, lineoftherapy)
 ```
 
 #n=17,804
@@ -3609,4 +3691,5 @@ regression_data2 %>%
   as_gt() %>% 
   gt::gtsave("Early_stage_by_AGE_16MAR.docx")
 ```
+
 
