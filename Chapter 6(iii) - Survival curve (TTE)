@@ -293,3 +293,4 @@ survival_curve_plot <- ggplot(risk_curves2, aes(x = interval, y = survival, colo
              #linewidth = 1,
              #color = "black") +
   ylim(50, 100)
+ 
