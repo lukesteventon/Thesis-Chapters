@@ -83,20 +83,22 @@ trial_function<-function(sample_data){
   
   quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
   
-  IPCW_truncation<-quantile(sixcycles$IPCW, c(.99)) 
+  IPCW_truncation<-quantile(sixcycles$IPCW, c(.95)) 
   
   #Weights before truncation
-  #        1%          50%          75%          90%          95%          99%       100% 
-  # 1.000000         1.143339   1.216786      1.291885     1.352053     1.507941   1.982159
+#1%       50%      75%      90%      95%      99%        100% 
+#1.000000 1.189051 1.323898 1.540554 1.757819 2.336177   5.057631  
+
   
-  #Truncate IPCWs greater than the 99th percentile.
+  #Truncate IPCWs greater than the 95th percentile.
   sixcycles<-sixcycles %>% 
     mutate(IPCW=ifelse(IPCW>=IPCW_truncation ,IPCW_truncation ,IPCW))
   
   #Weights after truncation
   quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-  #      1%         50%          75%          90%           95%           99%         100% 
-  # 1.000000    1.143339     1.216786      1.291885       1.352053     1.507941     1.507941
+# 1%      50%      75%      90%      95%      99%       100%
+#1.000000 1.189051 1.323898 1.540554 1.757819 2.336177  2.336177
+ 
   #Logistic regression for probability of remaining uncensored at each time point
   probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
                                                                          REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
@@ -115,11 +117,13 @@ trial_function<-function(sample_data){
   
   quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
   
-  IPCW_truncation<-quantile(less_than_six_cycles$IPCW, c(.99)) 
+  IPCW_truncation<-quantile(less_than_six_cycles$IPCW, c(.95)) 
   
   #Weights before truncation
-  #        1%        50%        75%        90%        95%        99%       100% 
-  # 1.000000     4.676346    6.548843   10.269420   12.792998  23.689449  49.907231 
+#          1%          50%          75%          90% 
+#1.000000e+00 6.403243e+00 1.931180e+01 7.754549e+01 
+#         95%          99%         100% 
+#2.910823e+02 2.048777e+03 3.850216e+06 
   
   #Truncate IPCWs greater than the 99th percentile.
   less_than_six_cycles<-less_than_six_cycles %>% 
@@ -127,8 +131,10 @@ trial_function<-function(sample_data){
   
   #Weights after truncation
   quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
-  #      1%      50%       75%       90%        95%       99%     100% 
-  #  1.000000  4.676346  6.548843 10.269420 12.792998 23.689449 23.689449
+ #      1%        50%        75%        90% 
+#  1.000000   6.403243  19.311796  77.545486 
+#       95%        99%       100% 
+#291.082339 291.082339 291.082
   
   
   #Create a new dataset containing data for all patients
