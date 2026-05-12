@@ -1,85 +1,281 @@
-continuation_df <- long_format %>%
-  filter(followup_curve == 1) %>%
-  mutate(treatment = "continuation")
+library(tidyverse)
+library(data.table)
+setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 6  - Target trial emulation study")
+getwd()
+testdata<-read_csv("data_with_censoring.csv")
+#select required columns and recode to correct variable type
+testdata<-testdata %>% 
+  #select(PSEUDO_PAT,interval,survivalmarker,BMI,ETHNICITY,STAGE_BEST,QUINTILE_2015,AGE_AT_FIRST_TREATMENT, numberofcycles, discontinuation,maxcycle) %>% 
+  mutate(ETHNICITY=as.character(ETHNICITY)) %>% 
+  #mutate(STAGE=as.character(STAGE_BEST_CLEAN)) %>% 
+  #mutate(AGE=AGE_AT_FIRST_TREATMENT) %>% 
+  #mutate(DEPRIVATION=as.character(QUINTILE_2015)) %>% 
+  #mutate(censor=as.character(discontinuation)) %>% 
+  #mutate(ID=as.character(PSEUDONYMISED_PATIENTID)) %>% 
+  mutate(interval=as.numeric(str_replace_all(interval,'interval',''))) %>% 
+  arrange(ID, interval) %>% 
+  mutate(time=interval) %>% 
+  mutate(timesq=as.factor(time^2)) %>%
+  mutate(timesqch=as.factor(time^2)) %>% 
+  mutate(time=as.factor(time)) %>% 
+  rename(maxcycle=maxcycles)
 
-tapering_df <- long_format %>%
-  filter(followup_curve == 1) %>%
-  mutate(treatment = "tapering")
+testdata %>% 
+  count(ID) #n=2,260
 
-# create hazards under each strategy
-tapering_df$hazard1 <- predict(survival_curve_model, newdata=tapering_df, type="response")
-continuation_df$hazard0 <- predict(survival_curve_model, newdata=continuation_df, type="response")
+#This section defines the trial function as the application of censoring, IPCW weighting and survival model. This will be defined and repeated via bootstrapping.
 
-# calculate survival from the cumulative of 1-hazard
-tapering_df <- tapering_df %>%
-  group_by(patid) %>%
-  mutate(survival1 = cumprod(1-hazard1)) %>%
-  ungroup()
+  sixcycles <- testdata %>% 
+    filter(strategy=="Completion") %>% 
+    mutate(censor=as.numeric(ifelse(numberofcycles==maxcycle&maxcycle<6&interval>0,1,0))) %>% 
+    filter(censor==0|(censor==1&lag(censor)==0)) #Censor patients when they deviate from the assigned treatment strategy
+  #censor=0 means that the patient remains in the study
 
-continuation_df <- continuation_df %>%
-  group_by(patid) %>%
-  mutate(survival0 = cumprod(1-hazard0)) %>%
-  ungroup()
+  
+  sixcycles$time_strategy <- paste(sixcycles$time,sixcycles$strategy)
+  sixcycles$timesq_strategy <-paste (sixcycles$timesqch,sixcycles$strategy)
+  
+  less_than_six_cycles <- testdata  %>% 
+    filter(strategy=="Discontinuation") %>% 
+    mutate(censor=as.numeric(ifelse(numberofcycles>5&interval>0,1,0))) %>% 
+    filter((censor==0)|censor==1&lag(censor)==0) #Censor patients when they deviate from the assigned treatment strategy
+  
+  
+  less_than_six_cycles%>% count(ID)
+  
+  less_than_six_cycles$time_strategy<-paste(less_than_six_cycles$time,less_than_six_cycles$strategy)
+  less_than_six_cycles$timesq_strategy<-paste(less_than_six_cycles$timesqch,less_than_six_cycles$strategy)
+  #These are the two dataframes that we need to start with:
 
-# estimate risks as 1-survival
-tapering_df <- tapering_df %>%
-  mutate(risk1 = 1-survival1)
+  
+  #This logistic regression produces coefficients for covariates and the probabilty of remaining uncensored (i.e. remaining in the study)
+  probability_of_uncensoring_sixcycles<-suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
+                                                               REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=sixcycles))
+  #Maintenance flag was removed as this is given post first-line chemotherapy and is there a post-baseline exposure and shouldn't be incorporated into IPCW. Comment on this in the manuscript.
+  
+  
 
-continuation_df <- continuation_df %>%
-  mutate(risk0 = 1-survival0)
+  sixcycles <- sixcycles %>% 
+    mutate(p1=predict(probability_of_uncensoring_sixcycles, type = "response")) #This line creates a new column with 
+  
+  
+  sixcycles <- sixcycles %>% #This calculates the cumulative probability of being uncensored at each timepoint
+    group_by(ID) %>% 
+    mutate(cumulative_probability_uncensored=cumprod(p1)) %>% 
+    ungroup()
+  
+  sixcycles <- sixcycles %>%#Calculate IPCW as 1/probability of being uncensored
+    mutate(IPCW=(1/cumulative_probability_uncensored))
+  
+  quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
+  
+  mean(sixcycles$IPCW) #1.162
+  sd(sixcycles$IPCW) #0.086
+  IPCW_truncation<-quantile(sixcycles$IPCW, c(.95)) 
+  
+  #Weights before truncation
+  #1%       50%      75%      90%      95%      99%        100% 
+  #1.000000 1.189051 1.323898 1.540554 1.757819 2.336177   5.057631  
+  
+  
+  #Truncate IPCWs greater than the 95th percentile.
+  sixcycles<-sixcycles %>% 
+    mutate(IPCW=ifelse(IPCW>=IPCW_truncation ,IPCW_truncation ,IPCW))
+  
+  mean(sixcycles$IPCW) #1.1.159
+  sd(sixcycles$IPCW) #0.086
+  #Weights after truncation
+  quantile(sixcycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
+  # 1%      50%      75%      90%      95%      99%       100%
+  #1.000000 1.189051 1.323898 1.540554 1.757819 2.336177  2.336177
+  
+  #Logistic regression for probability of remaining uncensored at each time point
+  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
+  
 
-# calculate mean for each time point
-tapering_risk <- tapering_df %>%
-  group_by(t, treatment) %>%
-  summarise(risk = mean(risk1),
-            survival = mean(survival1),
-            hazard = mean(hazard1))
+  
+  less_than_six_cycles<-less_than_six_cycles %>% 
+    mutate(p1=predict(probability_of_uncensoring_lessthansixcycles, type = "response")) #This line creates a new column with 
+  
+  less_than_six_cycles$p1
+  
+  less_than_six_cycles<-less_than_six_cycles %>% #This calculates the cumulative probability of being uncensored at each timepoint
+    group_by(ID) %>% 
+    mutate(cumulative_probability_uncensored=cumprod(p1)) %>% 
+    ungroup()
+  
+  less_than_six_cycles<-less_than_six_cycles %>%#Calculate IPCW as 1/probability of being uncensored
+    mutate(IPCW=(1/cumulative_probability_uncensored))
+  
+  quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
+  
+  mean(less_than_six_cycles$IPCW) #5.32
+  sd(less_than_six_cycles$IPCW) #4.20
+  
+  IPCW_truncation<-quantile(less_than_six_cycles$IPCW, c(.95)) 
+  
+  #Weights before truncation
+  #     1%       50%       75% 
+  #1.000000  5.092910  6.965319 
+  #     90%       95%       99% 
+  #9.874817 12.039365 15.859119 
+  #    100% 
+  #80.010751 
+  
+  #Truncate IPCWs greater than the 99th percentile.
+  less_than_six_cycles<-less_than_six_cycles %>% 
+    mutate(IPCW=ifelse(IPCW>=IPCW_truncation ,IPCW_truncation ,IPCW))
+  
+  mean(less_than_six_cycles$IPCW) #5.12
+  sd(less_than_six_cycles$IPCW) #3.22
+  
+  #Weights after truncation
+  quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
+  #      1%        50%        75%        90% 
+  #     1%       50%       75% 
+  #1.000000  5.092910  6.965319 
+  #     90%       95%       99% 
+  #9.874817 12.039365   12.039365
+  
+  
+  #Create a new dataset containing data for all patients
+  combined_dataset<-rbind(less_than_six_cycles,sixcycles) %>% 
+    filter(censor==0)
+  
+  #Convert columns to numerics to run glm
+  combined_dataset <- combined_dataset %>% 
+    mutate(AGE=as.numeric(AGE)) %>% 
+    mutate(ETHNICITY=as.factor(ETHNICITY)) %>% 
+    mutate(STAGE=as.factor(STAGE)) %>% 
+    mutate(time=as.numeric(time)) %>% 
+    mutate(timesq=as.numeric(timesq)) %>% 
+    mutate(BMI=as.numeric(BMI)) %>% 
+    #mutate(IPCW=as.numeric(IPCW)) %>% 
+    mutate(survivalmarker=as.factor(survivalmarker)) %>% 
+    mutate(censor=as.numeric(censor)) %>% 
+    mutate(DEPRIVATION=as.factor(DEPRIVATION)) %>% 
+    mutate(TREATINGCENTRETYPE=as.factor(TREATINGCENTRETYPE)) %>%
+    mutate(REGION=as.factor(REGION)) %>%
+    mutate(GRADE=as.factor(GRADE)) %>%
+    mutate(time_strategy=as.factor(time_strategy)) %>% 
+    mutate(strategy=ifelse(str_detect(strategy, "Discontinuation"), 0,1)) 
+  
+  #Logistic regression for probability of surviving at each time point.
+  #need to ensure that all variables are either numeric or factors - glm cant handle #characters
+  survival_curve_model<-glm(survivalmarker~time+timesq+time_strategy+BMI+GRADE+
+                              REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,data=combined_dataset, weights=IPCW,family = "binomial")
+  
+  #Olivia code for survival analysis
+  completion_df <- combined_dataset %>%
+    mutate(row=interval) %>% 
+    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,
+                  REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
+    filter(strategy==1) #Completion
+  
+  discontinuation_df <- combined_dataset %>%
+    mutate(row=interval) %>% 
+    dplyr::select(ID,time,timesq,time_strategy,timesq_strategy,BMI,GRADE,
+                  REGION,TREATINGCENTRETYPE,ETHNICITY,AGE,STAGE,DEPRIVATION,yearoftreatment,interval, survivalmarker, discontinuation,interval,censor,row,maxcycle,strategy) %>% 
+    filter(strategy==0) #Discontinuation
+  
+  # create hazards under each strategy at each  interval
+  completion_df$hazard1 <- predict(survival_curve_model, newdata=completion_df, type="response")
+  discontinuation_df$hazard0 <- predict(survival_curve_model, newdata=discontinuation_df, type="response")
+  
+  # calculate risk as 1-hazard at each time point
+  discontinuation_df<-discontinuation_df %>%    
+    group_by(ID) %>% 
+    arrange(ID, time) %>% 
+    mutate(risk0 = (1-hazard0)) %>%
+    mutate(survival_probability0=1-risk0) %>% 
+    ungroup()
+  
+  discontinuation_df %>% 
+    select(hazard0,survival_probability0,risk0)  %>% 
+    summary()
+  
+  completion_df<-completion_df %>%    
+    group_by(ID) %>% 
+    arrange(ID, time) %>% 
+    mutate(risk1 = (1-hazard1)) %>%
+    mutate(survival_probability1=1-risk1) %>% 
+    ungroup()
+  
+  # calculate mean for each time point
+  discontinuation_df2 <- discontinuation_df %>%
+    group_by(interval) %>%
+    summarise(risk = mean(risk0),
+              survival = mean(survival_probability0),
+              hazard = mean(hazard0),
+              lower_ci=quantile(survival_probability0,0.05),
+              upper_ci=quantile(survival_probability0,0.95),
+              lowerci_risk=quantile(risk0,0.05),
+              upperci_risk=quantile(risk0,0.95)) %>% 
+    mutate(strategy="Discontinuation")
+  
+  discontinuation_df2 %>% 
+    select(risk,lowerci_risk,upperci_risk,survival,lower_ci,upper_ci,hazard)  %>% 
+    summary()  
+  
+  completion_df2 <- completion_df %>%
+    group_by(interval) %>%
+    summarise(risk = mean(risk1),
+              survival = mean(survival_probability1),
+              hazard = mean(hazard1),
+              lower_ci=quantile(survival_probability1,0.05),
+              upper_ci=quantile(survival_probability1,0.95),
+              lowerci_risk=quantile(risk1,0.05),
+              upperci_risk=quantile(risk1,0.95)) %>% 
+    mutate(strategy="Completion")
+  
+  completion_df2 %>% 
+    select(risk,lowerci_risk,upperci_risk,survival,lower_ci,upper_ci,hazard)  %>% 
+    summary()   
+  
+  #Estimate CI
+  discontinuation<-discontinuation_df2 %>% 
+    filter(strategy=="Discontinuation")
+  completion<-completion_df2 %>% 
+    filter(strategy=="Completion")
+  mean(discontinuation$survival) #0.6083858
+  mean(discontinuation$lower_ci) #0.3909705
+  mean(discontinuation$upper_ci) #0.8559938
+  mean(discontinuation$risk) #0.3916142
+  mean(discontinuation$lowerci_risk) #0.1440062
+  mean(discontinuation$upperci_risk) #0.6090295
+  
+  #Estimates for completion arms  
+  mean(completion$survival) #0.7858685
+  mean(completion$lower_ci) #0.6338571
+  mean(completion$upper_ci) #0.9281912
+  mean(completion$risk) # 0.2141315
+  mean(completion$lowerci_risk) #0.07180877
+  mean(completion$upperci_risk) #0.3661429
+  
+  discontinuation_df2<-discontinuation_df2 %>% 
+    arrange(risk) %>% 
+    mutate(interval=row_number())
+  
+  completion_df2<-completion_df2 %>% 
+    arrange(risk) %>% 
+    mutate(interval=row_number())
+  
+  #Estimate hazard ratios, absolute and risk ratios. Save this as a dataframe.
+  risk_curves <- full_join(discontinuation_df2, completion_df2)
 
-continuation_risk <- continuation_df %>%
-  group_by(t, treatment) %>%
-  summarise(risk = mean(risk0),
-            survival = mean(survival0),
-            hazard = mean(hazard0))
-
-risk_curves <- full_join(tapering_risk, continuation_risk)
-
-
-.....
-
-risk_df <- data.frame(
-  estimate_hr = hazard_ratio_estimate,
-  risk_ratio_12months = risk_ratio_12,
-  risk_ratio_24months = risk_ratio_24,
-  risk_diff_12months = risk_diff_12,
-  risk_diff_24months = risk_diff_24,
-  abs_risk_continuation_12 = continuation_risk_12,
-  abs_risk_continuation_24 = continuation_risk_24,
-  abs_risk_tapering_12 = tapering_risk_12, 
-  abs_risk_tapering_24 = tapering_risk_24
-)
-rownames(risk_df) <- NULL
-
-if(full_sample == TRUE){
-  fwrite(risk_df, paste0("analysis_results/Tapering Trials/", time_period, "/risk_estimates/stroke.csv"))
-}
-
-risk_curves <- risk_curves %>%
-  mutate(risk=risk*100)
-
-risk_curves <- rbind(
-  risk_curves,
-  data.frame(t = 0, risk = 0, treatment = "continuation"),
-  data.frame(t = 0, risk = 0, treatment = "tapering")
-)
-
-# Plot the survival curves
-survival_curve_plot <- ggplot(risk_curves, aes(x = t, y = risk, color = treatment)) +
+risk_curves2<-risk_curves %>% 
+  mutate(survival=survival*100) %>% 
+  mutate(lower_ci =lower_ci *100) %>% 
+  mutate(upper_ci=upper_ci*100)
+  
+  # Plot the survival curves
+survival_curve_plot <- ggplot(risk_curves2, aes(x = interval, y = survival, color = strategy)) +
   geom_line(linewidth=1)+
   labs(
-    title = "Stroke Cumulative Incidence Curves by Treatment",
+    title = "Overall survival by treatment strategy",
     x = "Time (months)",
-    y = "Cumulative Incidence (%)",
-    color = "Treatment"
+    y = "Overall survival (%)",
+    color = "Treatment strategy"
   ) +
   theme_minimal(base_size = 14) +
   theme(
@@ -92,8 +288,8 @@ survival_curve_plot <- ggplot(risk_curves, aes(x = t, y = risk, color = treatmen
     plot.title = element_text(size = 16, face = "bold")
   ) +
   # vertical line at end of grace period
-  geom_vline(xintercept = 6, 
-             linetype = "dashed", 
-             linewidth = 1,
-             color = "black") +
-  ylim(0, 32)
+  #geom_vline(xintercept = 6, 
+             ##linetype = "dashed", 
+             #linewidth = 1,
+             #color = "black") +
+  ylim(50, 100)
