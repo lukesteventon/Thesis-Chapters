@@ -102,10 +102,13 @@ trial_function<-function(sample_data){
   #Logistic regression for probability of remaining uncensored at each time point
   probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
                                                                          REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
+                                                                         
+                                                                         summary(probability_of_uncensoring_lessthansixcycles$)
   
   less_than_six_cycles<-less_than_six_cycles %>% 
     mutate(p1=predict(probability_of_uncensoring_lessthansixcycles, type = "response")) #This line creates a new column with 
   
+  less_than_six_cycles$p1
   
   less_than_six_cycles<-less_than_six_cycles %>% #This calculates the cumulative probability of being uncensored at each timepoint
     group_by(ID) %>% 
