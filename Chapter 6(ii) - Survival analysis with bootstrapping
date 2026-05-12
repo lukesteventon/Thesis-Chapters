@@ -26,7 +26,7 @@ testdata %>%
 #This section defines the trial function as the application of censoring, IPCW weighting and survival model. This will be defined and repeated via bootstrapping.
 trial_function<-function(sample_data){
   
-  sixcycles <- sample_data %>% 
+  sixcycles <- testdata %>% 
     filter(strategy=="Completion") %>% 
     mutate(censor=as.numeric(ifelse(numberofcycles==maxcycle&maxcycle<6&interval>0,1,0))) %>% 
     filter(censor==0|(censor==1&lag(censor)==0)) #Censor patients when they deviate from the assigned treatment strategy
@@ -39,7 +39,7 @@ trial_function<-function(sample_data){
   sixcycles$time_strategy <- paste(sixcycles$time,sixcycles$strategy)
   sixcycles$timesq_strategy <-paste (sixcycles$timesqch,sixcycles$strategy)
   
-  less_than_six_cycles <- sample_data  %>% 
+  less_than_six_cycles <- testdata  %>% 
     filter(strategy=="Discontinuation") %>% 
     mutate(censor=as.numeric(ifelse(numberofcycles>5&interval>0,1,0))) %>% 
     filter((censor==0)|censor==1&lag(censor)==0) #Censor patients when they deviate from the assigned treatment strategy
@@ -100,8 +100,7 @@ trial_function<-function(sample_data){
 #1.000000 1.189051 1.323898 1.540554 1.757819 2.336177  2.336177
  
   #Logistic regression for probability of remaining uncensored at each time point
-  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+
-                                                                         REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
+  probability_of_uncensoring_lessthansixcycles <- suppressWarnings(glm(censor==0~time+timesq+time_strategy+timesq_strategy+BMI+GRADE+REGION+TREATINGCENTRETYPE+ETHNICITY+AGE+STAGE+DEPRIVATION+yearoftreatment,family = "binomial", data=less_than_six_cycles))
                                                                          
                                                                          summary(probability_of_uncensoring_lessthansixcycles$)
   
@@ -123,10 +122,12 @@ trial_function<-function(sample_data){
   IPCW_truncation<-quantile(less_than_six_cycles$IPCW, c(.95)) 
   
   #Weights before truncation
-#          1%          50%          75%          90% 
-#1.000000e+00 6.403243e+00 1.931180e+01 7.754549e+01 
-#         95%          99%         100% 
-#2.910823e+02 2.048777e+03 3.850216e+06 
+ #     1%       50%       75% 
+ #1.000000  5.092910  6.965319 
+ #     90%       95%       99% 
+ #9.874817 12.039365 15.859119 
+ #    100% 
+#80.010751 
   
   #Truncate IPCWs greater than the 99th percentile.
   less_than_six_cycles<-less_than_six_cycles %>% 
@@ -135,9 +136,10 @@ trial_function<-function(sample_data){
   #Weights after truncation
   quantile(less_than_six_cycles$IPCW, c(0.01,0.5,0.75,0.90,0.95,.99,1)) 
  #      1%        50%        75%        90% 
-#  1.000000   6.403243  19.311796  77.545486 
-#       95%        99%       100% 
-#291.082339 291.082339 291.082
+#     1%       50%       75% 
+ #1.000000  5.092910  6.965319 
+ #     90%       95%       99% 
+ #9.874817 12.039365   12.039365
   
   
   #Create a new dataset containing data for all patients
