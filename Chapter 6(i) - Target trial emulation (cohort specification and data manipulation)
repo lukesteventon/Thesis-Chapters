@@ -2078,6 +2078,7 @@ data_with_censoring %>%
 
 Read csv
 ```{r}
+fdsa
 data_with_censoring<-read_csv(
   "data_with_censoring.csv",
   col_names = TRUE,
@@ -2249,8 +2250,8 @@ Plot SMD balance:
 ```{r}
 library(cobalt)
 loveplotdata<-cohort %>% 
-  mutate(AGE=as.numeric(AGE)) %>% 
-  mutate(BMI=as.numeric(BMI)) %>% 
+ mutate(AGE=as.numeric(AGE)) %>% 
+ mutate(BMI=as.numeric(BMI)) %>% 
  rename("Index of multiple deprivation"=DEPRIVATION) %>% 
  rename("Body mass index"=BMI) %>% 
  rename("Age"=AGE) %>% 
@@ -2266,8 +2267,7 @@ loveplotdata<-cohort %>%
  select(Age, 'Cancer stage', "Body mass index", "Index of multiple deprivation","Year of treatment", Ethnicity, 'Centre type', Region,IPCW,strategy) %>% 
   mutate(IPCW=as.numeric(IPCW)) 
 
-PLOT<-bal.tab(loveplotdata$strategy
- ~ Age +`Cancer stage`+ ``Body mass index`+ `Index of multiple deprivation`+ `Year of treatment`+Ethnicity+ `Centre type`+ Region , data = loveplotdata,
+PLOT<-bal.tab(strategy~ Age +`Cancer stage`+ `Body mass index`+ `Index of multiple deprivation`+ `Year of treatment`+Ethnicity+ `Centre type`+ Region, data = loveplotdata,
         weights = "IPCW",
         disp = c("means", "sdm"), un = TRUE, 
         stats = c("mean.diffs"))
