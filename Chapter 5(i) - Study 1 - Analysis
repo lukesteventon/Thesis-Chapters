@@ -1,0 +1,410 @@
+---
+title: "Study 1 - Analysis"
+output: html_document
+date: "2026-05-12"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(kableExtra)
+library(broom)
+library(broom.helpers)
+library(ggplot2)
+library(skimr)
+library(survminer)
+library(survival)
+library(rbin)
+library(readr)
+library(here)
+library(gtsummary)
+knitr::opts_chunk$set(echo = TRUE)
+getwd()
+#setwd("K://QNAP//BRCT//SACT project//LSanalysis//Rstudio//Study 1 Unplanned admissions")
+setwd("K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Unplanned admissions during first-line chemotherapy")
+```
+
+```{r cars}
+regression_data2<-read_csv(
+  "K:\\QNAP\\BRCT\\SACT project\\LSanalysis\\Thesis Chapters\\Chapter 5 - Unplanned admissions during first-line chemotherapy\\regression_data.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) %>% 
+  mutate(indextoadmission=as.numeric(indextoadmission)) %>% 
+  mutate(emergency_diagnosis_flag=ifelse(is.na(emergency_diagnosis_flag),0,emergency_diagnosis_flag)) %>% 
+  mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>%
+  mutate(admission_within_126_days=ifelse(is.na(admission_within_126_days),0,admission_within_126_days)) %>%
+  group_by(PSEUDO_PAT) %>% 
+  mutate(index=as.Date(index)) %>% 
+  mutate(VITALSTATUSDATE=dmy(VITALSTATUSDATE)) %>%
+  mutate(survival=difftime(VITALSTATUSDATE,index, units = "days")) %>% 
+  mutate(twomonth_mortality=ifelse(survival<62&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
+  mutate(oneyear_mortality=ifelse(survival<366&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
+  mutate(fiveyear_mortality=ifelse(survival<1825&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
+  ungroup()
+```
+
+Two-month mortality by emergency or routine presentation:
+```{r}
+regression_data2 %>% count(twomonth_mortality) #=603/12508 die within two months
+
+regression_data2 %>% 
+  select(twomonth_mortality, emergency_diagnosis_flag, admission_within_30_days, admission_within_126_days) %>% 
+  tbl_summary(by="emergency_diagnosis_flag") %>% 
+  add_overall() %>% 
+  add_n() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("two_month_mortality.docx")
+```
+
+One-year mortality by emergency or routine presentation:
+```{r}
+regression_data2 %>% count(oneyear_mortality) #=3181/12508 die within one year
+
+regression_data2 %>% 
+  select(oneyear_mortality, emergency_diagnosis_flag, admission_within_30_days, admission_within_126_days) %>% 
+  tbl_summary(by="emergency_diagnosis_flag")%>% 
+   add_overall() %>% 
+  add_n() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("one_year_mortality.docx")
+```
+
+Five-year mortality by emergency or routine presentation:
+```{r}
+regression_data2 %>% count(fiveyear_mortality) #=8807/12508 die within one year
+
+regression_data2 %>% 
+  select(fiveyear_mortality, emergency_diagnosis_flag, admission_within_30_days, admission_within_126_days) %>% 
+  tbl_summary(by="emergency_diagnosis_flag")%>% 
+   add_overall() %>% 
+  add_n() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("five year_mortality.docx")
+```
+```{r}
+table<-regression_data2 %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(BMI=as.numeric(BMI))
+
+table$ethnicitygroup<-relevel(as.factor(table$ethnicitygroup), ref = "White")
+table$ETHNICITYNAME<-as.factor(table$ETHNICITYNAME)
+table$ETHNICITYNAME<-relevel(table$ETHNICITYNAME, ref = "White")
+table$surgery<-as.factor(table$surgery)
+table$surgery<-relevel(table$surgery, ref = "PDS")
+table$IMD2015_1<-as.factor(table$IMD2015_1)
+table$IMD2015_1<-relevel(table$IMD2015_1, ref = "3")
+table$REGION<-as.factor(table$REGION)
+table$REGION<-relevel(table$REGION, ref = "LONDON COMMISSIONING REGION")
+table$ETHNICITYNAME<-as.factor(table$ETHNICITYNAME)
+table$ETHNICITYNAME<-relevel(table$ETHNICITYNAME, ref = "White")
+table$GRADE<-as.factor(table$GRADE)
+table$GRADE<-relevel(table$GRADE, ref = "Intermediate grade")
+table$BMI2<-as.factor(table$BMI2)
+table$BMI2<-relevel(table$BMI2, ref = "[18.5,25)")
+```
+
+
+Summary table for included patients:
+```{r}
+advanced_stage<-regression_data2 %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
+  mutate(AGE=as.numeric(AGE)) %>% 
+  mutate(BMI=as.numeric(BMI))
+
+advanced_stage$ethnicitygroup<-relevel(as.factor(advanced_stage$ethnicitygroup), ref = "White")
+advanced_stage$ETHNICITYNAME<-as.factor(advanced_stage$ETHNICITYNAME)
+advanced_stage$ETHNICITYNAME<-relevel(advanced_stage$ETHNICITYNAME, ref = "White")
+advanced_stage$surgery<-as.factor(advanced_stage$surgery)
+advanced_stage$surgery<-relevel(advanced_stage$surgery, ref = "PDS")
+advanced_stage$IMD2015_1<-as.factor(advanced_stage$IMD2015_1)
+advanced_stage$IMD2015_1<-relevel(advanced_stage$IMD2015_1, ref = "3")
+advanced_stage$REGION<-as.factor(advanced_stage$REGION)
+advanced_stage$REGION<-relevel(advanced_stage$REGION, ref = "LONDON COMMISSIONING REGION")
+advanced_stage$ETHNICITYNAME<-as.factor(advanced_stage$ETHNICITYNAME)
+advanced_stage$ETHNICITYNAME<-relevel(advanced_stage$ETHNICITYNAME, ref = "White")
+advanced_stage$GRADE<-as.factor(advanced_stage$GRADE)
+advanced_stage$GRADE<-relevel(advanced_stage$GRADE, ref = "Intermediate grade")
+advanced_stage$BMI2<-as.factor(advanced_stage$BMI2)
+advanced_stage$BMI2<-relevel(advanced_stage$BMI2, ref = "[18.5,25)")
+
+advanced_stage %>% 
+   mutate(STAGE=ifelse(str_detect(STAGE_BEST,"2B|2C|3|4"),"Advanced stage","Early stage")) %>% 
+select(admission_within_30_days,admission_within_126_days, emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="surgery") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  as_gt() %>% 
+  gt::gtsave("summary_table_by_surgery.docx")
+```
+Data cleaning and Recreate outcome for purposes of writing tables
+```{r}
+advanced_stage<-advanced_stage%>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(indextoadmission=difftime(firstadmissiondate, index, units = "days")) %>% 
+  mutate(indextoadmission=ifelse(indextoadmission<0,NA,indextoadmission)) %>% 
+  ungroup() %>% 
+  mutate(admission_within_30_days=ifelse(is.na(admission_within_30_days),0,admission_within_30_days)) %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days))
+```
+
+Analysis: primary surgery cohort:
+Split analyses by surgery type. We are only looking at advanced stage disease now (N=12,508)
+```{r}
+#Table one for primary surgery cohort
+advanced_stage %>% 
+  filter(surgery=="PDS") %>% 
+  select(admission_within_30_days,admission_within_126_days,indextoadmission, emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  mutate(ifelse(emergency_diagnosis_flag==1,"Emergency diagnosis 28 days", "No emergency diagnosis")) %>% 
+  tbl_summary(by="emergency_diagnosis_flag")%>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("summary_table_PDS.docx")
+
+#Glm for association of emergency diagnosis with hospitalisation during first-line chemotherapy
+
+#Primary surgery
+PDS<-regression_data2 %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
+  filter(surgery=="PDS")
+
+#Glm for advanced patients only
+PDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=PDS,family="binomial")
+
+#Summarise logistic regression
+summary(PDSglm) #n=2215
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(PDSglm, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("glm_pds_advanced_stage.docx")
+
+#Median time to admission for primary patients
+#indextoadmission
+# Min.   :  1.00  
+# 1st Qu.:  7.00  
+# Median : 24.00  
+# Mean   : 36.65  
+# 3rd Qu.: 61.75  
+# Max.   :126.00
+```
+
+
+
+IDS analysis
+```{r}
+#Table one for interval surgery cohort
+advanced_stage %>% 
+  filter(surgery=="IDS") %>% 
+   select(admission_within_30_days,admission_within_126_days,indextoadmission, emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  mutate(ifelse(emergency_diagnosis_flag==1,"Emergency diagnosis 28 days", "No emergency diagnosis")) %>% 
+  tbl_summary(by="emergency_diagnosis_flag")%>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("summary_table_IDS.docx")
+
+#Glm for association of emergency diagnosis with hospitalisation during first-line chemotherapy
+
+#Interval surgery
+IDS<-regression_data2 %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
+  filter(surgery=="IDS")
+
+#Glm for advanced patients only
+IDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=IDS,family="binomial")
+
+#Summarise logistic regression
+summary(IDSglm) #n=3605
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(IDSglm, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("glm_ids_advanced_stage.docx")
+
+#Median time to admission
+#indextoadmission
+# Min.   :  1.00  
+# 1st Qu.:  5.00  
+# Median : 16.00  
+# Mean   : 32.54  
+# 3rd Qu.: 50.00  
+# Max.   :126.00
+```
+
+No surgery analysis:
+```{r}
+#Table one for interval surgery cohort
+advanced_stage %>% 
+  filter(surgery=="No surgery") %>% 
+  select(admission_within_30_days,admission_within_126_days,indextoadmission, emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  mutate(ifelse(emergency_diagnosis_flag==1,"Emergency diagnosis 28 days", "No emergency diagnosis")) %>% 
+  tbl_summary(by="emergency_diagnosis_flag")%>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("summary_table_nosurgery.docx")
+
+#Glm for association of emergency diagnosis with hospitalisation during first-line chemotherapy
+
+#Interval surgery
+nosurgery<-regression_data2 %>% 
+  mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
+  mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
+  filter(surgery=="No surgery")
+
+#Glm for advanced patients only
+nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
+
+#Summarise logistic regression
+summary(nosurgeryglm) #n=4610
+
+#Create summary table of odds ratios using exponentiated coefficients from glm above.
+advanced_stage_surgery_table<-tbl_regression(nosurgeryglm, exponentiate = TRUE)
+
+#Save output of logistic regression analysis
+advanced_stage_surgery_table %>% 
+  as_gt() %>% 
+  gt::gtsave("glm_nosurgery_advanced_stage.docx")
+
+#indextoadmission
+# Min.   :  1.00  
+# 1st Qu.:  7.00  
+# Median : 21.00  
+# Mean   : 35.07  
+# 3rd Qu.: 56.00  
+# Max.   :126.00
+```
+Cox regression for mortality outcomes
+```{r}
+nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
+```
+
+Look at dose reductions in patients with emergency presentation:
+```{r}
+dose_analysis<-read_csv("relative_dose.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL) %>% 
+  filter(DRUG_GROUP=="CARBOPLATIN") %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  right_join(advanced_stage,by="PSEUDO_PAT") %>% 
+  select(relative_dose_mean,admission_within_30_days,admission_within_126_days,indextoadmission, emergency_diagnosis_flag,surgery,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen.x,year_of_treatment) %>% 
+    mutate(relative_dose_mean=as.numeric(relative_dose_mean))
+  
+
+#Compare dose in patients who had an emergency diagnosis
+dose_analysis %>% 
+  tbl_summary(by="emergency_diagnosis_flag") %>% 
+add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>%
+  gt::gtsave("carboplatin_dose_comparison_by_emergency_diagnosis.docx")
+```
+Demographics and emergency diagnosis
+```{r}
+table %>% 
+select(admission_within_30_days,admission_within_126_days,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="ethnicitygroup") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("comparison_by_ethnicity.docx")
+
+table %>% 
+select(admission_within_30_days,admission_within_126_days,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="IMD2015_1") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("comparison_by_IMD2015_1.docx")
+
+table %>% 
+select(admission_within_30_days,admission_within_126_days,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="REGION") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("comparison_by_REGION.docx")
+
+table %>% 
+select(admission_within_30_days,admission_within_126_days,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="REGION") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("comparison_by_region.docx")
+
+table %>% 
+select(admission_within_30_days,admission_within_126_days,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="CENTRETYPE") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci() %>% 
+  as_gt() %>% 
+  gt::gtsave("comparison_by_CENTRETYPE.docx")
+```
+```{r}
+dose<-read_csv("relative_dose.csv",
+  col_names = TRUE,
+  col_types = cols(.default = col_character()),
+  col_select = NULL)
+
+dose %>% 
+  group_by(PSEUDO_PAT) %>% 
+  mutate(cycle_number=as.numeric(cycle_number)) %>% 
+  mutate(cycle_number=ifelse(regimen=="Weekly",round(cycle_number/3),cycle_number)) %>% 
+  mutate(cycles_received=max(cycle_number)) %>% 
+  ungroup() %>% 
+  select(relative_dose_mean, cycles_received,PSEUDO_PAT) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  right_join(table,by="PSEUDO_PAT") %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(relative_dose_mean=as.numeric(relative_dose_mean)) %>% 
+select(admission_within_30_days,admission_within_126_days,relative_dose_mean, cycles_received,emergency_diagnosis_flag,surgery,twomonth_mortality,oneyear_mortality, fiveyear_mortality,notreatmentafteradmission,diedduringadmission, AGE,AGE2,GRADE,STAGE_BEST,STAGE_BEST_CLEAN,BMI,BMI2, PS,PS2,IMD2015_1,ethnicitygroup,ETHNICITY2,REGION,CENTRETYPE,regimen,year_of_treatment) %>% 
+  tbl_summary(by="emergency_diagnosis_flag") %>% 
+  add_n() %>% 
+  add_overall() %>% 
+  add_p() %>% 
+  add_ci()  %>% 
+  as_gt() %>% 
+  gt::gtsave("number_of_cycles_by_diagnostic_route.docx")
+    
+```
+
