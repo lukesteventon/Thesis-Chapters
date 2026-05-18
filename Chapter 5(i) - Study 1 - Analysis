@@ -40,6 +40,9 @@ regression_data2<-read_csv(
   mutate(twomonth_mortality=ifelse(survival<62&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
   mutate(oneyear_mortality=ifelse(survival<366&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
   mutate(fiveyear_mortality=ifelse(survival<1825&!is.na(survival)&str_detect(VITALSTATUS,"D"),1,0)) %>% 
+  mutate(STAGE_glm=ifelse(str_detect(STAGE_BEST,"2B|2C|3|4"),"2B",NA)) %>% 
+  mutate(STAGE_glm=ifelse(str_detect(STAGE_BEST,"3"),"3",STAGE_glm)) %>% 
+  mutate(STAGE_glm=ifelse(str_detect(STAGE_BEST,"4"),"4",STAGE_glm)) %>% 
   ungroup()
 ```
 
