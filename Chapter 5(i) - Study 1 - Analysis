@@ -183,7 +183,7 @@ PDS<-regression_data2 %>%
   filter(surgery=="PDS")
 
 #Glm for advanced patients only
-PDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=PDS,family="binomial")
+PDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST+GRADE+PS2+BMI2+regimen,data=PDS,family="binomial")
 
 #Summarise logistic regression
 summary(PDSglm) #n=2215
@@ -232,7 +232,7 @@ IDS<-regression_data2 %>%
   filter(surgery=="IDS")
 
 #Glm for advanced patients only
-IDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=IDS,family="binomial")
+IDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST+GRADE+PS2+BMI2+regimen,data=IDS,family="binomial")
 
 #Summarise logistic regression
 summary(IDSglm) #n=3605
@@ -279,7 +279,7 @@ nosurgery<-regression_data2 %>%
   filter(surgery=="No surgery")
 
 #Glm for advanced patients only
-nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
+nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
 
 #Summarise logistic regression
 summary(nosurgeryglm) #n=4610
@@ -302,7 +302,7 @@ advanced_stage_surgery_table %>%
 ```
 Cox regression for mortality outcomes
 ```{r}
-nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST_CLEAN+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
+nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_BEST+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
 ```
 
 Look at dose reductions in patients with emergency presentation:
