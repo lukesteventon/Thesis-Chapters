@@ -1136,7 +1136,7 @@ ethnicity_hist_data<-datasetclean %>%
   select(ETHNICITYNAME,PSEUDO_PAT) %>% 
   distinct(PSEUDO_PAT,.keep_all=T)
 
-ethnicity_after_clean_hist<-ggplot(data=ethnicity_hist_data, aes(x=ETHNICITYNAME))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Ethnicity distribution (after data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Ethnicity")+ theme(axis.text.x=element_text(angle=90))
+ethnicity_after_clean_hist<-ggplot(data=ethnicity_hist_data, aes(x=ETHNICITYNAME))+geom_bar(fill="darkgreen", width=0.225)+theme(ylab=FALSE)+labs(title="Ethnicity distribution (after data cleaning)", bins =40)+theme(plot.title=element_text(hjust=0.5))+xlab("Ethnicity")+ theme(axis.text.x=element_text(angle=90))+ylab("Number of patients")
 
 ggsave("ethnicity_after_cleaning.png",plot=ethnicity_after_clean_hist)
 ```
@@ -1204,8 +1204,21 @@ followup_dates %>%
 #Write plot of follow up dates
 ggsave("follow_up_status_coverage.png",plot=dates_plot)
 ```
+5vii): Age distribution.
+```{r}
+age<-datasetclean %>% 
+  filter(AGE>17) %>% 
+  distinct(PSEUDO_PAT,.keep_all=T) %>% 
+  mutate(AGE=as.numeric(AGE))
 
-5vii:) Overall assessment of data completeness:
+age_plot<-ggplot(data=age, aes(x=AGE))+geom_bar(fill="darkgreen", width=0.75)+theme(ylab=FALSE)+labs(title="Age distribution (SACT Dataset)", bins =20)+theme(plot.title=element_text(hjust=0.5))+xlab("Age (years)")+ylab("Number of patients")+ theme(axis.text.x=element_text(angle=90))+scale_x_continuous(breaks=c(18,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100))
+
+#Write plot of follow up dates
+ggsave("age_distribution.png",plot=age_plot)
+```
+
+
+5viii:) Overall assessment of data completeness:
 ```{r}
 datasetclean %>% 
 skimr::skim()
