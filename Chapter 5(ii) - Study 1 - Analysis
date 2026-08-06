@@ -185,6 +185,9 @@ PDS<-regression_data2 %>%
   mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
   filter(surgery=="PDS")
 
+PDS$ETHNICITYNAME<-as.factor(PDS$ETHNICITYNAME)
+PDS$ETHNICITYNAME<-relevel(PDS$ETHNICITYNAME, ref = "White")
+
 #Glm for advanced patients only
 PDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_glm+GRADE+PS2+BMI2+regimen,data=PDS,family="binomial")
 
@@ -234,6 +237,9 @@ IDS<-regression_data2 %>%
   mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
   filter(surgery=="IDS")
 
+IDS$ETHNICITYNAME<-as.factor(PDS$ETHNICITYNAME)
+IDS$ETHNICITYNAME<-relevel(PDS$ETHNICITYNAME, ref = "White")
+
 #Glm for advanced patients only
 IDSglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_glm+GRADE+PS2+BMI2+regimen,data=IDS,family="binomial")
 
@@ -280,6 +286,9 @@ nosurgery<-regression_data2 %>%
   mutate(admission_within_30_days=as.numeric(admission_within_30_days)) %>% 
   mutate(admission_within_126_days=as.numeric(admission_within_126_days)) %>% 
   filter(surgery=="No surgery")
+
+nosurgery$ETHNICITYNAME<-as.factor(nosurgery$ETHNICITYNAME)
+nosurgery$ETHNICITYNAME<-relevel(nosurgery$ETHNICITYNAME, ref = "White")
 
 #Glm for advanced patients only
 nosurgeryglm<-glm(admission_within_126_days~emergency_diagnosis_flag+ IMD2015_1+REGION+CENTRETYPE+ETHNICITYNAME+AGE2+STAGE_glm+GRADE+PS2+BMI2+regimen,data=nosurgery,family="binomial")
